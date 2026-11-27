@@ -2181,7 +2181,8 @@ function prPrint(){
   const {css,body}=sheetPrintHTML(cur()); let root=$("printRoot");
   if(!root){ root=document.createElement("div"); root.id="printRoot"; document.body.appendChild(root); }
   root.innerHTML=`<style>${css}</style>${body}`; document.body.classList.add("printing"); prClose();
-  const done=()=>{ document.body.classList.remove("printing"); window.removeEventListener("afterprint",done); };
+  /* the sheet's styles share class names with the app (.brand and others), so they leave the page as soon as printing ends */
+  const done=()=>{ document.body.classList.remove("printing"); window.removeEventListener("afterprint",done); root.innerHTML=""; };
   window.addEventListener("afterprint",done); setTimeout(()=>{ try{ window.print(); }catch(e){} setTimeout(done,1500); },120);
 }
 async function prDownload(){
