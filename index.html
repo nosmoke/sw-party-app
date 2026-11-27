@@ -285,6 +285,9 @@ body.ext .not-ext{display:none}
 .rl-asg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;margin:6px 0}
 .rl-asg label{display:flex;flex-direction:column;gap:2px;font-size:.85rem}
 .rl-asg select,.rl-asg input{font-size:16px;padding:4px 6px}
+.rl-asg label.rl-pr{font-weight:700;color:var(--accent)}
+.rl-asg label.rl-pr select,.rl-asg label.rl-pr input{border:2px solid var(--accent);font-weight:700}
+.rl-prn{margin:8px 0 2px}
 .rl-left{font-size:.9rem}.rl-left.bad{color:var(--bad,#b00)}.rl-left.ok{color:var(--ok,#2a7)}
 @media(max-width:480px){.rl-asg{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @keyframes rlIn{from{transform:rotate(-8deg) scale(.85);opacity:.2}to{transform:none;opacity:1}}
@@ -1805,6 +1808,8 @@ function rollNow(){
 function setSum(s){ return s.reduce((a,x)=>a+x.v,0); }
 function rollRender(anim){
   const c=cur(), M=ROLL_M[RL.m], r=c.abRoll&&!c.abRoll.applied&&c.abRoll.m===RL.m?c.abRoll:null;
+  const P=PROG[c.cls], PRIME=P&&P.prime?P.prime:[];
+  const primeNote=P?`<p class="small rl-prn">★ ${PRIME.length>1?"התכונות העיקריות":"התכונה העיקרית"} של ${esc(cname(c))}: <b>${PRIME.map(k=>ABIL.find(a=>a[0]===k)[1]).join(" ו")}</b>. ${PRIME.length>1?"ערך של 13 ומעלה בכולן":"ערך של 13 ומעלה"} נותן ‎+5% לנק״ן${P.src?` (${esc(P.src.split(" · ")[0])})`:""}.</p>`:`<p class="muted small">בחרו קודם סוג דמות, כדי לראות כאן את התכונות העיקריות שלו.</p>`;
   const dieHTML=x=>`<span class="rl-v" title="${x.d.join(" + ")}">${x.v}</span><span class="rl-d">${x.d.map((v,i)=>i===x.drop?`<s>${v}</s>`:v).join(" ")}</span>`;
   let h=`<fieldset class="rl-ms"><legend>שיטה</legend>${Object.entries(ROLL_M).map(([k,m])=>`<label class="rl-m"><input type="radio" name="rlm" value="${k}" ${RL.m===k?"checked":""}><span><b><bdi>${m.n}</bdi>: ${m.t}</b> <small class="muted">(${m.src})</small></span></label>`).join("")}</fieldset>
     <p class="small">${M.d}</p>`;
@@ -1813,7 +1818,7 @@ function rollRender(anim){
     const used=ABIL.reduce((s,[k])=>s+RL.pts[k],0), left=RL.pool-used;
     h+=`<div class="gm-row"><label for="rlPool">מאגר נקודות</label><input type="number" id="rlPool" min="54" max="72" value="${RL.pool}" style="width:6em">
       <span class="rl-left ${left<0?"bad":left===0?"ok":""}" aria-live="polite">${left>0?"נשארו "+left+" נקודות":left<0?"חריגה של "+(-left)+" נקודות":"כל הנקודות חולקו"}</span></div>
-      <div class="rl-asg">${ABIL.map(([k,l])=>`<label>${l}<input type="number" min="3" max="18" data-pt="${k}" value="${RL.pts[k]}"></label>`).join("")}</div>`;
+      ${primeNote}<div class="rl-asg">${ABIL.map(([k,l])=>`<label class="${PRIME.includes(k)?"rl-pr":""}">${PRIME.includes(k)?"★ ":""}${l}<input type="number" min="3" max="18" data-pt="${k}" value="${RL.pts[k]}"></label>`).join("")}</div>`;
   } else {
     h+=`<div class="gm-row"><button class="btn primary" id="rlGo">🎲 ${r?"גלגול חדש":"גלגול"}</button>${r?`<span class="muted small">גלגול מספר ${r.n} של הדמות · ${esc(gmDate(r.at))}</span>`:(c.abRoll&&c.abRoll.n?`<span class="muted small">הדמות כבר גולגלה ${c.abRoll.n===1?"פעם אחת":c.abRoll.n+" פעמים"}</span>`:"")}</div>`;
     if(r){
@@ -1822,8 +1827,8 @@ function rollRender(anim){
         <span class="rl-row">${s.map(dieHTML).map(x=>`<span class="rl-die">${x}</span>`).join("")}</span><span class="muted small">סה״כ ${setSum(s)}</span></label>`).join("")}</div>`;
       if(RL.set!=null){
         const s=r.sets[RL.set], taken=new Set(Object.values(RL.asg));
-        h+=`<div class="gm-row"><b class="small">שיוך לתכונות</b><button class="btn small" id="rlOrder">לפי הסדר</button><button class="btn small" id="rlDesc">מהגבוה לנמוך</button><button class="btn small ghost" id="rlClear">ניקוי</button></div>
-          <div class="rl-asg">${ABIL.map(([k,l])=>`<label>${l}<select data-as="${k}"><option value="">—</option>${s.map((x,i)=>(!taken.has(i)||RL.asg[k]===i)?`<option value="${i}" ${RL.asg[k]===i?"selected":""}>${x.v}</option>`:"").join("")}</select></label>`).join("")}</div>`;
+        h+=primeNote+`<div class="gm-row"><b class="small">שיוך לתכונות</b><button class="btn small" id="rlOrder">לפי הסדר</button><button class="btn small" id="rlDesc" title="הערכים הגבוהים הולכים קודם לתכונות העיקריות">מהגבוה לנמוך${PRIME.length?" (עיקריות קודם)":""}</button><button class="btn small ghost" id="rlClear">ניקוי</button></div>
+          <div class="rl-asg">${ABIL.map(([k,l])=>`<label class="${PRIME.includes(k)?"rl-pr":""}">${PRIME.includes(k)?"★ ":""}${l}<select data-as="${k}"><option value="">—</option>${s.map((x,i)=>(!taken.has(i)||RL.asg[k]===i)?`<option value="${i}" ${RL.asg[k]===i?"selected":""}>${x.v}</option>`:"").join("")}</select></label>`).join("")}</div>`;
       }
     }
   }
@@ -1837,7 +1842,7 @@ function rollRender(anim){
   const go=$("rlGo"); if(go) go.onclick=rollNow;
   B.querySelectorAll('[name=rls]').forEach(e=>e.onchange=()=>{ RL.set=Number(e.value); RL.asg={}; rollRender(); });
   B.querySelectorAll('[data-as]').forEach(e=>e.onchange=()=>{ if(e.value==="") delete RL.asg[e.dataset.as]; else RL.asg[e.dataset.as]=Number(e.value); rollRender(); });
-  const ord=(desc)=>{ const s=r.sets[RL.set]; const idx=s.map((x,i)=>i); if(desc) idx.sort((a,b)=>s[b].v-s[a].v); RL.asg={}; ABIL.forEach(([k],j)=>RL.asg[k]=idx[j]); rollRender(); };
+  const ord=(desc)=>{ const s=r.sets[RL.set]; const idx=s.map((x,i)=>i); if(desc) idx.sort((a,b)=>s[b].v-s[a].v); RL.asg={}; const keys=desc?[...ABIL.filter(([k])=>PRIME.includes(k)),...ABIL.filter(([k])=>!PRIME.includes(k))]:ABIL; keys.forEach(([k],j)=>RL.asg[k]=idx[j]); rollRender(); };
   const o=$("rlOrder"); if(o) o.onclick=()=>ord(false); const de=$("rlDesc"); if(de) de.onclick=()=>ord(true);
   const cl=$("rlClear"); if(cl) cl.onclick=()=>{ RL.asg={}; rollRender(); };
   const pool=$("rlPool"); if(pool) pool.onchange=()=>{ RL.pool=Math.max(54,Math.min(72,Number(pool.value)||66)); rollRender(); };
