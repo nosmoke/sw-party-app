@@ -251,6 +251,7 @@ input[type=number],input[type=text],input[type=search],select,textarea{backgroun
 .st-bar{height:10px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden}.st-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
 .st-n{font-variant-numeric:tabular-nums;text-align:start}
 .app.player #gmStats,.app.player #gmDms,.app.player #gmLib{display:none}
+.lib-skill{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}.lib-skill summary{cursor:pointer;font-weight:600}.lib-skill ol{margin:6px 0;padding-inline-start:20px}.lib-skill li{margin:3px 0}
 .lib-acts{display:flex;gap:6px;flex-wrap:wrap}
 .bked{position:fixed;inset:0;z-index:70;background:rgba(20,16,10,.45);display:flex;align-items:center;justify-content:center;padding:12px}
 body.bked-open{overflow:hidden}
@@ -2817,7 +2818,7 @@ async function renderMap(){
   if(!b){ root.innerHTML=`<h2>מפת מבוך</h2><p class="muted">${esc(QERR||"טוען את המפה…")}</p>`; return; }
   const P=b.map&&b.map.players;
   if(!P){ root.innerHTML=`<h2>${esc(b.title)}</h2><p class="muted">להרפתקה הזו אין עדיין מפה לשחקנים.</p>`; return; }
-  const st=(q.by&&q.by[id]&&q.by[id].rooms)||{}, seen=Object.keys(P.regions).filter(k=>st[k]&&st[k].st);
+  const st=(q.by&&q.by[id]&&q.by[id].rooms)||{}, seen=Object.keys(P.regions||{}).filter(k=>st[k]&&st[k].st);
   const sig=id+"|"+seen.join(",")+"|"+PM_ZOOM, cv=$("pmCanvas"), im=pmImg(P.file);
   if(cv&&root.dataset.sig===sig&&cv.dataset.drawn) return;   /* nothing changed: keep the scroll position */
   const ow=root.querySelector(".pm-wrap"), keep=ow&&root.classList.contains("zoom")===PM_ZOOM?[ow.scrollLeft,ow.scrollTop]:null;   /* a new room keeps the view where it was */
@@ -2829,7 +2830,7 @@ async function renderMap(){
   /* a hidden room drawn over the base map once it is marked, e.g. a secret room behind a plain corridor wall */
   const pats=(P.patches||[]).filter(x=>seen.includes(x.room)).map(x=>({box:x.box,im:pmImg(x.file)}));
   if(!im.complete||!im.naturalWidth||pats.some(x=>!x.im.complete||!x.im.naturalWidth)) return;
-  drawPMap($("pmCanvas"),im,P.regions,seen,pats); $("pmCanvas").dataset.drawn="1";
+  drawPMap($("pmCanvas"),im,P.regions||{},seen,pats); $("pmCanvas").dataset.drawn="1";
   const w=root.querySelector(".pm-wrap"); if(w&&keep){ w.scrollLeft=keep[0]; w.scrollTop=keep[1]; }
 }
 /* zoomed map: drag with the mouse to move around, like the DM's map (touch scrolls natively) */
@@ -5095,7 +5096,17 @@ function libPaint(){
       <div class="lib-acts">${b.ready?`<button class="btn small" data-lib-view="${esc(b.id)}">${admin||mine?"עיון ועריכה":"עיון"}</button>`:""}${b.ready&&(admin||mine)?`<button class="btn small" data-lib-dl="${esc(b.id)}">הורדה</button>`:""}${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`;
   h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json,image/*" multiple hidden ${LIB_BUSY?"disabled":""}>
     ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>
-    <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"בוחרים קובץ הרפתקה מוכן (json), או את קובץ הספר יחד עם תמונות המפות שלו. לפני השמירה מוצגת בדיקה. הרפתקה עם אותו מזהה מתעדכנת."}</p>${libPrevHTML()}`;
+    <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"בוחרים קובץ הרפתקה מוכן (json), או את קובץ הספר יחד עם תמונות המפות שלו. לפני השמירה מוצגת בדיקה. הרפתקה עם אותו מזהה מתעדכנת."}</p>${libPrevHTML()}
+    <details class="lib-skill"><summary>הכנת הרפתקה חדשה בעזרת Claude</summary>
+      <p class="small">Claude יכול להפוך הרפתקה לקובץ שהאפליקציה מקבלת: מ־PDF, מצילומי עמודים או מקובץ Word שכתבתם בעצמכם, בעברית או באנגלית (ואז הוא מתרגם). הוא בונה את החדרים, המפלצות, המלכודות והאוצרות, ומכין את המפות: סיכה לכל חדר, מפה לשחקנים בלי מספרים ואזור לכל חדר.</p>
+      <ol class="small">
+        <li><a href="sw-adventure-maker.zip" download>מורידים את הסקיל</a> (קובץ zip, לא פותחים אותו).</li>
+        <li>ב־Claude, בהגדרות: <bdi>Settings → Capabilities</bdi>, מוודאים שהאפשרות <bdi>Code execution and file creation</bdi> פעילה.</li>
+        <li>מתקינים את הסקיל: <bdi>Customize → Skills → + → Create skill → Upload a skill</bdi>, ובוחרים את הקובץ שהורדתם.</li>
+        <li>בשיחה חדשה מצרפים את ההרפתקה וכותבים למשל: "תכין מזה הרפתקה לאפליקציית החבורה".</li>
+        <li>את הקובץ ש־Claude מחזיר מעלים כאן, ב"העלאת הרפתקה".</li>
+      </ol>
+      <p class="muted small">גרסה חדשה של הסקיל מתקינים באותה דרך, אחרי מחיקת הגרסה הקודמת ב־<bdi>Skills</bdi>.</p></details>`;
   box.innerHTML=h;
   const f=$("libFile"); if(f) f.onchange=()=>{ const x=f.files&&[...f.files]; if(x&&x.length) libPick(x); f.value=""; };
   const sv=$("libSave"); if(sv) sv.onclick=libSave; const cn=$("libCancel"); if(cn) cn.onclick=()=>{ LIB_PREV=null; LIB_ERR=""; libPaint(); };
