@@ -2763,6 +2763,9 @@ function sheetPrintHTML(c){
 .wt{width:100%;border-collapse:collapse;font-size:9pt;margin-top:1mm}.wt th{font-size:8pt;text-align:right;border-bottom:1.6px solid #111;padding:1mm}
 .wt td{border-bottom:1px dotted #888;padding:.8mm 1mm;height:5.8mm}.wt td.n{font-weight:800;white-space:nowrap}
 .ls{margin:0;padding:0 4mm 0 0;font-size:8.6pt;line-height:1.35}.ls li{margin:.4mm 0}
+.ls li.more{font-weight:700;list-style:none}
+.ls.two{columns:2;column-gap:5mm}.ls.two li{break-inside:avoid}
+.gear-more[hidden]{display:none}
 .ln{border-bottom:1px dotted #888;height:5.6mm}
 .cols.grow .col,.back{display:flex;flex-direction:column}.fill{flex:1;min-height:6mm;background:repeating-linear-gradient(to bottom,transparent 0 5.3mm,#aaa 5.3mm 5.6mm)}
 .d{direction:ltr;unicode-bidi:isolate;white-space:nowrap}.r{direction:rtl;unicode-bidi:isolate;white-space:nowrap}.ls li{text-wrap:pretty}
@@ -2800,7 +2803,7 @@ function sheetPrintHTML(c){
     <div class="cols grow">
       <div class="col">${prRibbon("לחשים")}${spellsHTML}<div class="fill"></div></div>
       <div class="col">${prRibbon("יכולות מיוחדות")}${skl.length?`<div class="sk">${skl.map(([a,b])=>`<span>${esc(a)}</span><b>${nb(b)}</b>`).join("")}</div>`:""}${list(abl,1)}<div class="fill"></div></div>
-      <div class="col">${prRibbon("ציוד נוסף")}${list(gear,1)}<div class="fill"></div>
+      <div class="col">${prRibbon("ציוד נוסף")}${gear.length?`<ul class="ls gear${gear.length>8?" two":""}">${gear.map(x=>`<li>${nb(x)}</li>`).join("")}</ul>`:lines(1)}<div class="fill"></div>
         <div class="money">${[["מ״ז",gp],["מ״כ",sp],["מ״נ",cpn]].map(([k,v])=>`<div><b>${v}</b><span>${k}</span></div>`).join("")}</div></div>
     </div>
     <div class="pr-foot">${esc(c.name||"")} · הודפס מאפליקציית החבורה · לפי דף הדמות בחוברת לשחקן המתחיל (ש 69–70)</div></section>`;
@@ -2809,6 +2812,7 @@ function sheetPrintHTML(c){
     ${pos==="front"||pos==="bg"?"":`<div class="por">${c.portrait?`<img src="${c.portrait}" alt="">`:`<div class="ph">איור הדמות</div>`}</div>`}
     ${prRibbon("רקע")}${c.bg?`<p class="sm" style="white-space:pre-wrap">${esc(c.bg)}</p><div class="fill" style="flex:${pos==="front"||pos==="bg"?1.4:.6}"></div>`:(pos==="front"||pos==="bg"?'<div class="fill" style="flex:1.4"></div>':lines(7))}
     <p class="sm"><b>שפות:</b> ${(langMigrate(c),esc(langAll(c).join(", ")))}</p>
+    <div class="gear-more" hidden>${prRibbon("ציוד נוסף (המשך מעמוד 1)")}<ul class="ls gear two"></ul></div>
     ${prRibbon("הערות")}${c.notes?`<p class="sm" style="white-space:pre-wrap">${esc(c.notes)}</p>`:""}<div class="fill" style="margin-bottom:5mm"></div>
     <div class="pr-foot">${esc(c.name||"")} · עמוד 2</div></section>`;
   return {css,body:`<div class="prs">${front}${back}</div>`};
@@ -2902,10 +2906,17 @@ async function prGenHF(c,say){
 function prFit(root){
   var mm=96/25.4;
   root.querySelectorAll(".pg").forEach(function(pg){
-    var R=pg.getBoundingClientRect(); if(!R.height) return; var lim=R.bottom-9.5*mm;
+    var R=pg.getBoundingClientRect(); if(!R.height) return; var lim0=R.bottom-9.5*mm;
     pg.querySelectorAll(".ls,.sk").forEach(function(u){
-      var fs=parseFloat(getComputedStyle(u).fontSize), last=u.lastElementChild, n=0;
-      while(last&&last.getBoundingClientRect().bottom>lim&&fs>7.4&&n<25){ fs-=.35; u.style.fontSize=fs+"px"; u.style.lineHeight="1.25"; n++; }
+      var col=u.closest(".col"), mon=col&&col.querySelector(".money"), lim=mon?Math.min(mon.getBoundingClientRect().top,lim0-mon.getBoundingClientRect().height-3*mm)-1.5*mm:lim0;
+      var over=function(){ var b=0; for(var i=0;i<u.children.length;i++) b=Math.max(b,u.children[i].getBoundingClientRect().bottom); return b>lim; };
+      var gear=u.classList.contains("gear")&&!u.closest(".gear-more"), fs=parseFloat(getComputedStyle(u).fontSize), n=0, min=gear?8.4:7.4;
+      while(u.lastElementChild&&over()&&fs>min&&n<25){ fs-=.35; u.style.fontSize=fs+"px"; u.style.lineHeight="1.25"; n++; }
+      /* still too long: the rest of the gear continues on page 2 */
+      var more=gear&&root.querySelector(".gear-more ul");
+      if(more){ while(u.children.length>1&&over()){ more.insertBefore(u.lastElementChild,more.firstChild); }
+        if(more.children.length){ more.closest(".gear-more").hidden=false; var hint=document.createElement("li"); hint.className="more"; hint.textContent="ועוד "+more.children.length+" פריטים בעמוד 2"; u.appendChild(hint);
+          while(u.children.length>2&&over()){ more.insertBefore(u.children[u.children.length-2],more.firstChild); hint.textContent="ועוד "+more.children.length+" פריטים בעמוד 2"; } } }
     });
   });
 }
