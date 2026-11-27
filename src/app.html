@@ -4986,6 +4986,26 @@ function libPrevHTML(){
       ${!R.errs.length&&!R.warns.length?`<p class="small">הכול תקין.</p>`:""}</div>`; }).join("")}
     <div class="gm-row"><button class="btn small primary" id="libSave" ${ok&&!LIB_BUSY?"":"disabled"}>${ok===LIB_PREV.length?(ok===1?"שמירה בספרייה":`שמירת ${ok} ההרפתקאות בספרייה`):ok===1?"שמירת ההרפתקה התקינה":ok?`שמירת ${ok} ההרפתקאות התקינות`:"אין מה לשמור"}</button><button class="btn small" id="libCancel">ביטול</button></div></div>`;
 }
+/* downloading a book back as one packaged file, the same kind the import takes: for a backup, or to pass to another DM */
+async function libDownload(id){
+  try{ toast("מכין את הקובץ…");
+    if(!QRAW[id]){ delete QBOOKS[id]; await qLoadBook(id); }
+    const raw=QRAW[id]; if(!raw){ toast("אין לך גישה לספר המלא"); return; }
+    const keys=new Set(); JSON.stringify(raw,(k,v)=>{ if(typeof v==="string"&&/^img:[pd]\d+$/.test(v)) keys.add(v.slice(4)); return v; });
+    const ext=d=>{ const m=/^data:image\/(\w+)/.exec(d||""); return m?(m[1]==="jpeg"?"jpg":m[1]):"jpg"; };
+    const M=raw.map||{}, P=M.players||{}, images={}, path={};
+    for(const k of keys){ const ck=id+"/"+k; let d=IMG_CACHE[ck];
+      if(!d){ const sn=await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).get(); d=sn.exists?sn.data().data:""; }
+      if(!d) continue;
+      const name="img:"+k===M.file?`${id}-map`:"img:"+k===P.file?`${id}-map-players`:`${id}-${k}`;
+      path[k]=`books/${name}.${ext(d)}`; images[path[k]]=d; }
+    const book=JSON.parse(JSON.stringify(raw),(kk,v)=>typeof v==="string"&&/^img:[pd]\d+$/.test(v)?(path[v.slice(4)]||""):v);
+    const blob=new Blob([JSON.stringify({format:"sw-adventure",version:1,books:[{book,images}]})],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`${id}.bundle.json`; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000);
+    toast(`הקובץ ${id}.bundle.json הורד`);
+  }catch(e){ console.warn(e); toast("ההורדה נכשלה. בדקו את החיבור ונסו שוב"); }
+}
 async function libLoad(){ if(!LIB_ON()||!gGoogle()) return; LIB="loading"; libPaint();
   try{ LIB=await libQuery(); LIB_ERR=""; }catch(e){ console.warn(e); LIB="error"; } libPaint(); }
 function libDelete(id,title){
@@ -5010,7 +5030,7 @@ function libPaint(){
       <div class="muted small">${esc(b.source||"")}${admin&&!mine?` · הועלתה על ידי <bdi>${esc(b.ownerEmail||"")}</bdi>`:""}</div>
       ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":mine?"רק שלך":"פתוחה לך דרך משחק שלך"}</div>`}
       ${!b.everyone&&(b.readers||[]).length&&(mine||admin)?`<div class="muted small">פתוחה גם למנחים במשחקים שמשתמשים בה: ${(b.readers||[]).map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""}</div>
-      <div class="lib-acts">${b.ready?`<button class="btn small" data-lib-view="${esc(b.id)}">${admin||mine?"עיון ועריכה":"עיון"}</button>`:""}${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`;
+      <div class="lib-acts">${b.ready?`<button class="btn small" data-lib-view="${esc(b.id)}">${admin||mine?"עיון ועריכה":"עיון"}</button>`:""}${b.ready&&(admin||mine)?`<button class="btn small" data-lib-dl="${esc(b.id)}">הורדה</button>`:""}${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`;
   h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json,image/*" multiple hidden ${LIB_BUSY?"disabled":""}>
     ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>
     <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"בוחרים קובץ הרפתקה מוכן (json), או את קובץ הספר יחד עם תמונות המפות שלו. לפני השמירה מוצגת בדיקה. הרפתקה עם אותו מזהה מתעדכנת."}</p>${libPrevHTML()}`;
@@ -5019,6 +5039,7 @@ function libPaint(){
   const sv=$("libSave"); if(sv) sv.onclick=libSave; const cn=$("libCancel"); if(cn) cn.onclick=()=>{ LIB_PREV=null; LIB_ERR=""; libPaint(); };
   box.querySelectorAll("[data-lib-del]").forEach(b=>b.onclick=()=>libDelete(b.dataset.libDel,b.dataset.t));
   box.querySelectorAll("[data-lib-view]").forEach(b=>b.onclick=()=>edOpen(b.dataset.libView,"browse"));
+  box.querySelectorAll("[data-lib-dl]").forEach(b=>b.onclick=()=>libDownload(b.dataset.libDl));
   box.querySelectorAll("[data-lib-every]").forEach(b=>b.onchange=()=>libEvery(b.dataset.libEvery,b.checked));
 }
 /* party basis for an adventure's own scaling instructions: size, the level most of the party has reached, average level */
