@@ -1996,7 +1996,6 @@ function rollApply(){
 function rollBind(){
   $("rollBtn").onclick=rollOpen; $("rollCancel").onclick=rollClose; $("rollApply").onclick=rollApply;
   $("rollScrim").addEventListener("click",e=>{ if(e.target.id==="rollScrim") rollClose(); });
-  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("rollScrim").hidden) rollClose(); });
 }
 /* the sheet notes how the scores were set, so the DM sees how many times a character was rolled */
 function rollNote(c){
@@ -2434,7 +2433,6 @@ function genClose(){ $("genScrim").hidden=true; GEN=null; }
 function genBind(){
   $("genSave").onclick=genSave; $("genCancel").onclick=genClose;
   $("genScrim").addEventListener("click",e=>{ if(e.target.id==="genScrim") genClose(); });
-  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("genScrim").hidden) genClose(); });
 }
 
 /* ---------- actions ---------- */
@@ -2744,7 +2742,6 @@ function pwChange(){
     <p class="muted small">${GAME?"הסיסמה שייכת למשחק הזה, ולכן היא חלה על כל המכשירים שמחוברים אליו.":"המכשיר לא מחובר למשחק, ולכן הסיסמה חלה רק עליו."} אם שכחת אותה, אפשר לבקש מ־Claude בשיחה לאפס אותה ל־123456.</p>`,[["שמירה","primary",go],["ביטול","",modeClose]]);
 }
 $("modeScrim").addEventListener("click",e=>{ if(e.target===$("modeScrim")) modeClose(); });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("modeScrim").hidden) modeClose(); });
 
 /* ---------- players' dungeon map: only the areas the DM marked as visited, drawn from a copy of the map without room numbers or DM marks ---------- */
 const PM_IMG={}; let PM_ZOOM=false;
@@ -3038,7 +3035,6 @@ function prPrint(){
 }
 $("shPrintBtn").onclick=prOpen; $("prDl").onclick=prPrint; $("prDl").textContent="🖨 הדפסה"; $("prCancel").onclick=prClose;
 $("prScrim").addEventListener("click",e=>{ if(e.target===$("prScrim")) prClose(); });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("prScrim").hidden) prClose(); });
 
 /* ---------- character lock: freezes the essentials (identity, class, level, abilities, max HP, spellbook) ---------- */
 const LOCK_SEL="#charName,#charClass,#startMoney,#rollMoney,#str,#limitOverride,#delChar,#shName,#shPlayer,#shClass,#shLevel,#shAlign,#shSex,#shAge,#shHPmax,#hpRoll,#shLangs,#rollBtn,[data-lang],#bookPickBtn,[id^='ab-'],#shBook [data-rm],#bookPick [data-add]";
@@ -3102,7 +3098,6 @@ function closeDlg(){$("scrim").hidden=true;dlgYes=null;}
 $("dlgNo").onclick=closeDlg;
 $("dlgYes").onclick=()=>{const f=dlgYes;closeDlg();if(f)f();};
 $("scrim").addEventListener("click",e=>{if(e.target===$("scrim"))closeDlg();});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("scrim").hidden)closeDlg();});
 
 function setTab(which){
   for(const [id,w] of [["tCat","cat"],["tKits","kits"],["tCart","cart"]]) $(id).setAttribute("aria-selected",String(which===w));
@@ -4073,7 +4068,6 @@ function doLevelUp(){
 $("lvNo").onclick=closeLevelUp;
 $("lvYes").onclick=doLevelUp;
 $("lvScrim").addEventListener("click",e=>{if(e.target===$("lvScrim"))closeLevelUp();});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("lvScrim").hidden)closeLevelUp();});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-lvup]"); if(!b) return; const c=state.chars.find(x=>x.id===b.dataset.lvup); if(c) openLevelUp(c);});
 function alog(t){const a=adv();a.log.unshift({t,at:Date.now(),r:a.combat?a.combat.round:null});if(a.log.length>300)a.log.length=300;}
 const isCaster=c=>slotsOf(c).some(n=>n>0)||(PROG[c.cls]&&PROG[c.cls].tattoos&&(c.book||[]).length>0);
@@ -4702,6 +4696,17 @@ async function edSave(raw){
   await dbRef.doc("books/"+id).update(up); Object.assign(QMETA[id],up);
   QRAW[id]=raw; const nb=await libImgs(id,JSON.parse(JSON.stringify(raw))); nb.id=id; QBOOKS[id]=nb; QINDEX=null; LIB=null;
 }
+
+/* ---------- ESC closes the window on top, one per press: a question first, then dialogs, the book editor, "what's new", settings ---------- */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape"||e.defaultPrevented||e.isComposing) return;
+  const open=id=>{ const x=$(id); return !!(x&&!x.hidden); };
+  const stops=[["scrim",()=>closeDlg()],["lvScrim",()=>closeLevelUp()],["prScrim",()=>prClose()],["rollScrim",()=>rollClose()],["genScrim",()=>genClose()],["modeScrim",()=>modeClose()],
+    ["bkEd",()=>{ if(ED&&ED.edit){ ask("לצאת בלי לשמור?","השינויים שלא נשמרו בטופס יאבדו.","יציאה",()=>{ if(ED.mode==="run") edClose(); else { ED.edit=false; edRender(); } }); } else edClose(); }],
+    ["relPanel",()=>{ $("relPanel").hidden=true; $("verBtn").focus(); }],
+    ["backupPanel",()=>{ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); $("backupBtn").focus(); }]];
+  for(const [id,fn] of stops) if(open(id)){ e.preventDefault(); fn(); return; }
+});
 
 /* ---------- the adventure library: books live in Firestore, books/{id}.
    The book document holds only what players may see (title, players' map); the book itself (books/{id}/dm/book) and the DM's pictures (dimg)
