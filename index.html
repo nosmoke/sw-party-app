@@ -2005,7 +2005,8 @@ $("modeBtn").onclick=()=>{
   if(EXT&&GAME) return modeGame();
   if(MODE==="player"){
     const go=async()=>{ const p=$("pwIn").value; if(await pwOk(p)){ modeClose(); setMode("dm"); } else { $("modeErr").textContent="הסיסמה שגויה"; $("pwIn").select(); } };
-    modeDlg("מעבר למצב מנחה",`<label for="pwIn">סיסמת המנחה</label><input type="password" id="pwIn" autocomplete="current-password">`,[["כניסה","primary",go],["ביטול","",modeClose]]);
+    const d=state.dm, dflt=!d||d.epoch!==PW_EPOCH||!d.hash;
+    modeDlg("מעבר למצב מנחה",`<label for="pwIn">סיסמת המנחה</label><input type="password" id="pwIn" autocomplete="current-password" ${dflt?'aria-describedby="pwHint"':""}>`+(dflt?`<p class="muted small" id="pwHint">ברירת המחדל של הסיסמה היא <b style="direction:ltr;unicode-bidi:isolate">${PW_DEFAULT}</b>. אחרי הכניסה כדאי לשנות אותה (לחיצה על ״מצב מנחה״ ← שינוי הסיסמה). כשהסיסמה תשתנה, השורה הזו תיעלם.</p>`:""),[["כניסה","primary",go],["ביטול","",modeClose]]);
     $("pwIn").onkeydown=e=>{ if(e.key==="Enter") go(); };
   } else {
     modeDlg("מצב מנחה",`<p>במצב מנחה כל המסכים פתוחים, ואפשר לשנות הכול גם בזמן הרפתקה. בכל פתיחה האפליקציה חוזרת למצב שחקנים.</p>`,
