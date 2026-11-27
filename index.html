@@ -270,6 +270,26 @@ body.ext .not-ext{display:none}
 .pr-ai-acts{display:flex;flex-wrap:wrap;gap:6px}.pr-new{display:flex;gap:10px;align-items:flex-start;margin-top:6px}.pr-new[hidden]{display:none}
 .pr-new img{width:120px;height:160px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff}
 #prScrim .dialog{max-height:90dvh;overflow-y:auto}
+.rl-dlg{max-width:560px;max-height:90vh;max-height:90dvh;overflow-y:auto}
+.rl-dlg p{margin:6px 0 8px}
+.rl-btn{float:left;font-size:.8rem}
+.rl-note{margin:6px 0 0}
+.rl-ms{border:0;padding:0;margin:0 0 6px;display:grid;gap:4px}.rl-ms legend{font-weight:600;margin-bottom:4px}
+.rl-m{display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:.92rem}
+.rl-sets{display:grid;gap:6px;margin:6px 0}
+.rl-set{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer}
+.rl-set.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.rl-row{display:flex;flex-wrap:wrap;gap:6px}
+.rl-die{display:flex;flex-direction:column;align-items:center;min-width:2.6em;border:1px solid var(--line);border-radius:8px;padding:2px 4px;background:var(--surface)}
+.rl-v{font-weight:700;font-size:1.15rem;font-variant-numeric:tabular-nums}.rl-d{font-size:.7rem;color:var(--muted);direction:ltr;unicode-bidi:isolate}.rl-d s{opacity:.6}
+.rl-asg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;margin:6px 0}
+.rl-asg label{display:flex;flex-direction:column;gap:2px;font-size:.85rem}
+.rl-asg select,.rl-asg input{font-size:16px;padding:4px 6px}
+.rl-left{font-size:.9rem}.rl-left.bad{color:var(--bad,#b00)}.rl-left.ok{color:var(--ok,#2a7)}
+@media(max-width:480px){.rl-asg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@keyframes rlIn{from{transform:rotate(-8deg) scale(.85);opacity:.2}to{transform:none;opacity:1}}
+.rl-anim .rl-die{animation:rlIn .35s ease-out both}
+@media(prefers-reduced-motion:reduce){.rl-anim .rl-die{animation:none}}
 #printRoot{display:none}
 @media print{body.printing > *:not(#printRoot){display:none!important} body.printing #printRoot{display:block!important} body.printing{background:#fff!important;padding:0!important}}
 /* view-only tracker in player mode */
@@ -620,7 +640,7 @@ body.ext .not-ext{display:none}
 .spl b{font-size:1.4rem;font-family:var(--font-display);font-weight:400}
 .gg{display:grid;grid-template-columns:8em minmax(0,1fr);gap:8px;font-size:.88rem;padding:4px 0;border-bottom:1px dashed var(--line)}
 .gm{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-#shLangs,#shNotes{width:100%}
+#shLangs,#shNotes,#shBg{width:100%}
 .muted{color:var(--muted)} .small{font-size:.8rem;margin:6px 0 0} .dn{color:var(--bad)}
 @media (max-width:860px){.abil{grid-template-columns:repeat(3,minmax(0,1fr))}.cgrid{grid-template-columns:repeat(2,minmax(0,1fr))}#shHPbox{grid-column:1/-1}.sh-name{font-size:1.4rem}}
 .hp{flex-wrap:wrap;align-items:flex-end}.hp input{min-width:0}
@@ -886,7 +906,7 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
         <div class="dn small" id="shAlignWarn" hidden></div>
       </div>
 
-      <section class="sbox sh-abil"><h3>תכונות <small>ש 19–22</small></h3><div class="abil" id="shAbil"></div></section>
+      <section class="sbox sh-abil"><h3>תכונות <small>ש 19–22</small> <button class="btn small rl-btn" id="rollBtn" type="button">🎲 גלגול תכונות</button></h3><div class="abil" id="shAbil"></div><p class="muted small rl-note" id="shRollNote"></p></section>
 
       <section class="sbox sh-combat"><h3>קרב</h3>
         <div class="cgrid">
@@ -915,7 +935,8 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
       <section class="sbox" id="shTurnBox"><h3 id="shTurnTitle">גירוש אל־מתים <small>ש 26</small></h3><div id="shTurn"></div></section>
       <section class="sbox sh-wide"><h3>ציוד וכסף <small>מהחנות</small></h3><div id="shGear"></div></section>
       <section class="sbox"><h3>שפות <small>ש 21</small></h3><div id="shLangInfo"></div><input type="text" id="shLangs" placeholder="השפות שנבחרו" aria-label="שפות שנבחרו"></section>
-      <section class="sbox"><h3>הערות</h3><textarea id="shNotes" rows="5" placeholder="רקע, סגנונות לחימה וטכניקות שנבחרו, לחשים בספר…" aria-label="הערות"></textarea></section>
+      <section class="sbox"><h3>רקע</h3><textarea id="shBg" rows="5" placeholder="מאיפה הדמות באה, משפחה, מה מניע אותה, אופי, מראה…" aria-label="רקע"></textarea></section>
+      <section class="sbox"><h3>הערות</h3><textarea id="shNotes" rows="5" placeholder="סגנונות לחימה וטכניקות שנבחרו, לחשים בספר…" aria-label="הערות"></textarea></section>
     </div>
   </section>
 
@@ -975,6 +996,13 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
     <div id="prBody"></div>
     <p class="muted small not-ext">בתוך Claude הדפדפן לא מאפשר לפתוח הדפסה ישירות. לכן הדף נשמר כקובץ: פותחים אותו, והוא נשלח להדפסה מעצמו.</p>
     <div class="acts"><button class="btn primary" id="prDl">שמירה והדפסה</button><button class="btn" id="prCancel">ביטול</button></div>
+  </div>
+</div>
+<div class="scrim" id="rollScrim" hidden>
+  <div class="dialog rl-dlg" role="dialog" aria-modal="true" aria-labelledby="rollTitle">
+    <h3 id="rollTitle" tabindex="-1">גלגול תכונות</h3>
+    <div id="rollBody"></div>
+    <div class="acts"><button class="btn primary" id="rollApply" disabled>קביעת התכונות</button><button class="btn" id="rollCancel">ביטול</button></div>
   </div>
 </div>
 <div class="scrim" id="modeScrim" hidden>
@@ -1316,7 +1344,7 @@ function speed(wtKg,carry){
 
 /* ---------- state ---------- */
 const uid=()=>Math.random().toString(36).slice(2,10);
-const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",notes:"",player:"",age:"",sex:"",locked:false};
+const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",notes:"",bg:"",player:"",age:"",sex:"",locked:false};
 function newChar(name){return Object.assign({id:uid(),name:name||"דמות חדשה",cls:"",money:100,str:10,limit:null,cart:[],inv:[],spent:0,gain:0},SHEET_DEF,{book:[]});}
 let state={current:null,chars:[]};
 let saveTimer=null, store=null, dirty=false, writing=false, lastSaved=null, unsub=null, dbRef=null, uidRef=null;
@@ -1733,6 +1761,97 @@ function renderHF(){
     <button class="btn small" id="hfSave">שמירה</button>${t?`<button class="btn small ghost" id="hfDel">הסרה</button>`:""}</div>`;
   $("hfSave").onclick=()=>{ const v=$("hfIn").value.trim(); if(!v) return; try{ localStorage.setItem("sw-hf-token",v); }catch(e){} toast("הטוקן נשמר במכשיר הזה"); renderHF(); };
   const d=$("hfDel"); if(d) d.onclick=()=>{ try{ localStorage.removeItem("sw-hf-token"); }catch(e){} toast("הטוקן הוסר"); renderHF(); };
+}
+
+/* ---------- rolling ability scores (ש 19, מ 32, house rule 1) ----------
+   The roll is kept on the character as soon as it is made (c.abRoll), so closing the window and opening it again
+   shows the same dice; a new roll is counted, and the count is shown to everyone. */
+const ROLL_M={
+  house:{n:"חוק הבית",t:"4 סטים של 3ק6",d:"מגלגלים 4 סטים של 6 תכונות (3ק6 לכל תכונה), בוחרים סט אחד ומשייכים את ששת הערכים שלו לתכונות לפי הבחירה.",src:"חוקי הבית · מ 32",sets:4,dice:3},
+  basic:{n:"בסיסי",t:"סט אחד של 3ק6",d:"מגלגלים 3ק6 שש פעמים ומשייכים כל תוצאה לאחת התכונות.",src:"ש 19",sets:1,dice:3},
+  multi:{n:"שיטה I",t:"ריבוי סטים",d:"קובעים מראש כמה סטים של 6 גלגולים (מומלץ 3–6). השחקן בוחר סט אחד.",src:"מ 32",dice:3},
+  best3:{n:"שיטה III",t:"4ק6, שלוש הגבוהות",d:"במקום 3ק6, מגלגלים 4ק6 ומחברים את שלוש הקוביות הגבוהות.",src:"מ 32",sets:1,dice:4},
+  points:{n:"שיטה II",t:"חלוקת נקודות",d:"מחלקים מאגר נקודות בין 6 התכונות. כל תכונה לפחות 3 ולכל היותר 18. מומלץ 66 (לא פחות מ־54 ולא יותר מ־72).",src:"מ 32"}
+};
+let RL=null;   /* the window's working state: {m, nsets, pool, set, asg:{str:index}, pts:{str:n}} */
+const d6=()=>{ const a=new Uint32Array(1); let x; do{ crypto.getRandomValues(a); x=a[0]; }while(x>=4294967292); return 1+x%6; };
+function rollSets(m,n){
+  const M=ROLL_M[m]; return [...Array(n)].map(()=>[...Array(6)].map(()=>{
+    const d=[...Array(M.dice)].map(d6); let drop=-1;
+    if(M.dice===4){ drop=d.indexOf(Math.min(...d)); }
+    return {d,drop,v:d.reduce((s,x,i)=>i===drop?s:s+x,0)}; }));
+}
+function rollOpen(){
+  const c=cur(); if(frozen()){ toast("הדמויות נעולות בזמן הרפתקה"); return; }
+  const r=c.abRoll&&!c.abRoll.applied?c.abRoll:null;
+  RL={m:r?r.m:"house",nsets:r?r.sets.length:4,pool:r&&r.pool?r.pool:66,set:r&&r.sets.length===1?0:null,asg:{},pts:{}};
+  for(const [k] of ABIL) RL.pts[k]=clampA(c[k]);
+  rollRender(); $("rollScrim").hidden=false; $("rollTitle").focus();
+}
+function rollClose(){ $("rollScrim").hidden=true; RL=null; }
+function rollNow(){
+  const c=cur(), M=ROLL_M[RL.m], n=RL.m==="multi"?RL.nsets:M.sets;
+  const prev=c.abRoll||{}; const count=(prev.n||0)+1;
+  c.abRoll={n:count,m:RL.m,at:new Date().toISOString(),sets:rollSets(RL.m,n),applied:false};
+  RL.set=n===1?0:null; RL.asg={}; schedule(); rollRender(true);
+}
+function setSum(s){ return s.reduce((a,x)=>a+x.v,0); }
+function rollRender(anim){
+  const c=cur(), M=ROLL_M[RL.m], r=c.abRoll&&!c.abRoll.applied&&c.abRoll.m===RL.m?c.abRoll:null;
+  const dieHTML=x=>`<span class="rl-v" title="${x.d.join(" + ")}">${x.v}</span><span class="rl-d">${x.d.map((v,i)=>i===x.drop?`<s>${v}</s>`:v).join(" ")}</span>`;
+  let h=`<fieldset class="rl-ms"><legend>שיטה</legend>${Object.entries(ROLL_M).map(([k,m])=>`<label class="rl-m"><input type="radio" name="rlm" value="${k}" ${RL.m===k?"checked":""}><span><b><bdi>${m.n}</bdi>: ${m.t}</b> <small class="muted">(${m.src})</small></span></label>`).join("")}</fieldset>
+    <p class="small">${M.d}</p>`;
+  if(RL.m==="multi") h+=`<div class="gm-row"><label for="rlN">מספר סטים</label><select id="rlN">${[3,4,5,6].map(n=>`<option ${n===RL.nsets?"selected":""}>${n}</option>`).join("")}</select></div>`;
+  if(RL.m==="points"){
+    const used=ABIL.reduce((s,[k])=>s+RL.pts[k],0), left=RL.pool-used;
+    h+=`<div class="gm-row"><label for="rlPool">מאגר נקודות</label><input type="number" id="rlPool" min="54" max="72" value="${RL.pool}" style="width:6em">
+      <span class="rl-left ${left<0?"bad":left===0?"ok":""}" aria-live="polite">${left>0?"נשארו "+left+" נקודות":left<0?"חריגה של "+(-left)+" נקודות":"כל הנקודות חולקו"}</span></div>
+      <div class="rl-asg">${ABIL.map(([k,l])=>`<label>${l}<input type="number" min="3" max="18" data-pt="${k}" value="${RL.pts[k]}"></label>`).join("")}</div>`;
+  } else {
+    h+=`<div class="gm-row"><button class="btn primary" id="rlGo">🎲 ${r?"גלגול חדש":"גלגול"}</button>${r?`<span class="muted small">גלגול מספר ${r.n} של הדמות · ${esc(gmDate(r.at))}</span>`:(c.abRoll&&c.abRoll.n?`<span class="muted small">הדמות כבר גולגלה ${c.abRoll.n===1?"פעם אחת":c.abRoll.n+" פעמים"}</span>`:"")}</div>`;
+    if(r){
+      if(r.sets.length>1) h+=`<p class="small"><b>בחרו סט:</b></p>`;
+      h+=`<div class="rl-sets">${r.sets.map((s,i)=>`<label class="rl-set ${RL.set===i?"on":""} ${anim?"rl-anim":""}">${r.sets.length>1?`<input type="radio" name="rls" value="${i}" ${RL.set===i?"checked":""}>`:""}
+        <span class="rl-row">${s.map(dieHTML).map(x=>`<span class="rl-die">${x}</span>`).join("")}</span><span class="muted small">סה״כ ${setSum(s)}</span></label>`).join("")}</div>`;
+      if(RL.set!=null){
+        const s=r.sets[RL.set], taken=new Set(Object.values(RL.asg));
+        h+=`<div class="gm-row"><b class="small">שיוך לתכונות</b><button class="btn small" id="rlOrder">לפי הסדר</button><button class="btn small" id="rlDesc">מהגבוה לנמוך</button><button class="btn small ghost" id="rlClear">ניקוי</button></div>
+          <div class="rl-asg">${ABIL.map(([k,l])=>`<label>${l}<select data-as="${k}"><option value="">—</option>${s.map((x,i)=>(!taken.has(i)||RL.asg[k]===i)?`<option value="${i}" ${RL.asg[k]===i?"selected":""}>${x.v}</option>`:"").join("")}</select></label>`).join("")}</div>`;
+      }
+    }
+  }
+  const ready=RL.m==="points"?ABIL.reduce((s,[k])=>s+RL.pts[k],0)===RL.pool&&ABIL.every(([k])=>RL.pts[k]>=3&&RL.pts[k]<=18):(r&&RL.set!=null&&ABIL.every(([k])=>RL.asg[k]!=null));
+  const lv=lvlOf(c), had=ABIL.some(([k])=>c[k]!=null&&c[k]!==10);
+  h+=had?`<p class="muted small">התכונות הנוכחיות של ${esc(c.name||"הדמות")} יוחלפו${lv>1?` (הדמות בדרגה ${lv})`:""}.</p>`:"";
+  $("rollBody").innerHTML=h; $("rollApply").disabled=!ready;
+  const B=$("rollBody");
+  B.querySelectorAll('[name=rlm]').forEach(e=>e.onchange=()=>{ RL.m=e.value; const rr=c.abRoll&&!c.abRoll.applied&&c.abRoll.m===RL.m?c.abRoll:null; RL.set=rr&&rr.sets.length===1?0:null; RL.asg={}; rollRender(); });
+  const n=$("rlN"); if(n) n.onchange=()=>{ RL.nsets=Number(n.value); rollRender(); };
+  const go=$("rlGo"); if(go) go.onclick=rollNow;
+  B.querySelectorAll('[name=rls]').forEach(e=>e.onchange=()=>{ RL.set=Number(e.value); RL.asg={}; rollRender(); });
+  B.querySelectorAll('[data-as]').forEach(e=>e.onchange=()=>{ if(e.value==="") delete RL.asg[e.dataset.as]; else RL.asg[e.dataset.as]=Number(e.value); rollRender(); });
+  const ord=(desc)=>{ const s=r.sets[RL.set]; const idx=s.map((x,i)=>i); if(desc) idx.sort((a,b)=>s[b].v-s[a].v); RL.asg={}; ABIL.forEach(([k],j)=>RL.asg[k]=idx[j]); rollRender(); };
+  const o=$("rlOrder"); if(o) o.onclick=()=>ord(false); const de=$("rlDesc"); if(de) de.onclick=()=>ord(true);
+  const cl=$("rlClear"); if(cl) cl.onclick=()=>{ RL.asg={}; rollRender(); };
+  const pool=$("rlPool"); if(pool) pool.onchange=()=>{ RL.pool=Math.max(54,Math.min(72,Number(pool.value)||66)); rollRender(); };
+  B.querySelectorAll('[data-pt]').forEach(e=>e.onchange=()=>{ RL.pts[e.dataset.pt]=Math.max(3,Math.min(18,Number(e.value)||3)); rollRender(); });
+}
+function rollApply(){
+  const c=cur(); if(frozen()) return;
+  if(RL.m==="points"){ for(const [k] of ABIL) c[k]=RL.pts[k]; c.abRoll=Object.assign({},c.abRoll||{},{m:"points",pool:RL.pool,at:new Date().toISOString(),applied:true,sets:[]}); }
+  else { const r=c.abRoll, s=r.sets[RL.set]; for(const [k] of ABIL) c[k]=s[RL.asg[k]].v; r.applied=true; r.chosen=RL.set; r.appliedAt=new Date().toISOString(); }
+  schedule(); rollClose(); renderAll(); toast("התכונות עודכנו");
+}
+function rollBind(){
+  $("rollBtn").onclick=rollOpen; $("rollCancel").onclick=rollClose; $("rollApply").onclick=rollApply;
+  $("rollScrim").addEventListener("click",e=>{ if(e.target.id==="rollScrim") rollClose(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("rollScrim").hidden) rollClose(); });
+}
+/* the sheet notes how the scores were set, so the DM sees how many times a character was rolled */
+function rollNote(c){
+  const r=c.abRoll; if(!r||!r.applied) return r&&r.n?`גולגל ${r.n===1?"פעם אחת":r.n+" פעמים"}, עוד לא נבחר סט`:"";
+  if(r.m==="points") return `חלוקת נקודות (${r.pool}) · ${gmDate(r.at)}`;
+  return `${ROLL_M[r.m]?ROLL_M[r.m].n:""} · ${r.n===1?"גלגול אחד":r.n+" גלגולים"} · ${gmDate(r.appliedAt||r.at)}`;
 }
 
 /* ---------- actions ---------- */
@@ -2233,7 +2352,7 @@ function sheetPrintHTML(c){
   const back=`<section class="pg back">
     <div class="hd"><div class="flds" style="padding-top:0">${field("שם השחקן",c.player)}${field("שם הדמות",c.name)}</div></div>
     ${pos==="front"||pos==="bg"?"":`<div class="por">${c.portrait?`<img src="${c.portrait}" alt="">`:`<div class="ph">איור הדמות</div>`}</div>`}
-    ${prRibbon("רקע")}${pos==="front"||pos==="bg"?'<div class="fill" style="flex:1.4"></div>':lines(7)}
+    ${prRibbon("רקע")}${c.bg?`<p class="sm" style="white-space:pre-wrap">${esc(c.bg)}</p><div class="fill" style="flex:${pos==="front"||pos==="bg"?1.4:.6}"></div>`:(pos==="front"||pos==="bg"?'<div class="fill" style="flex:1.4"></div>':lines(7))}
     ${c.langs?`<p class="sm"><b>שפות:</b> ${esc(c.langs)}</p>`:""}
     ${prRibbon("הערות")}${c.notes?`<p class="sm" style="white-space:pre-wrap">${esc(c.notes)}</p>`:""}<div class="fill" style="margin-bottom:5mm"></div>
     <div class="foot">${esc(c.name||"")} · עמוד 2</div></section>`;
@@ -2521,7 +2640,7 @@ const PROG={
 };
 const SAVE_NAMES=["לחשים","מוות ורעל","נשיפת דרקון","מלכודות וסכנות"];
 const ABIL_TEXT={
- thief:[[1,"דקירה בגב: בהפתעה מאחור +4 לפגיעה ונזק כפול (משולש מדרגה 5)","ש 24"],[3,"קריאת שפה רגילה: 80% להבין מפות ומסמכים","ש 24"],[6,"קריאת כתבים קסומים: מפענח מגילות וכתבי קוסמים ומטיל מהם לחשים עד מחצית הדרגה (מעוגל מטה). לחש גבוה יותר: ראו בחוברת","מת' 5"],[10,"דקירה בגב: נזק פי 4","מת' 5"],[12,"אשף חמיקה (אם ימצא מורה): פעם בסיבוב חצי נזק מנשק בבדיקת זריזות, ופעם בסיבוב בלי נזק מלחש או נשיפה בהצלה מוצלחת (חצי בכישלון)","מת' 5–6"],[15,"דקירה בגב: נזק פי 5","מת' 5"]],
+ thief:[[1,"דקירה בגב: בהפתעה מאחור +4 לפגיעה ונזק כפול; משולש בדרגות 5–9, פי 4 בדרגות 10–14, פי 5 מדרגה 15","ש 24 · מת' 5"],[3,"קריאת שפה רגילה: 80% להבין מפות ומסמכים","ש 24"],[6,"קריאת כתבים קסומים: מפענח מגילות וכתבי קוסמים ומטיל מהם לחשים עד מחצית הדרגה (מעוגל מטה). לחש גבוה יותר: ראו בחוברת","מת' 5"],[10,"דקירה בגב: נזק פי 4","מת' 5"],[12,"אשף חמיקה (אם ימצא מורה): פעם בסיבוב חצי נזק מנשק בבדיקת זריזות, ופעם בסיבוב בלי נזק מלחש או נשיפה בהצלה מוצלחת (חצי בכישלון)","מת' 5–6"],[15,"דקירה בגב: נזק פי 5","מת' 5"]],
  cleric:[[1,"הטלת לחשי קדושה מכל הרשימה, לפי מספר הלחשים ביום","ש 26"],[1,"גירוש אל־מתים: רק כוהן הנוטה לסדר","ש 26"],[6,"גירוש אל־מתים לפי טבלה 4: מדרגה 6 גם השמדה (ה) של אל־מתים חלשים","מת' 8"],[12,"לחשים נשגבים (עוצמה 6): אחרי מסע רוחני אצל כוהן נשגב ובדיקת חוכמה","מת' 9"]],
  fighter:[[1,"לחימה בנשק דו־ידני עם תוספי הכוח","ש 28"],[1,"הדיפת התקפות","ש 28–29"],[3,"סגנון לחימה ראשון: התקפה ברוטלית, מכה מלומדת או פעולת הסחה","ש 29"],[5,"סגנון לחימה שני","ש 29"],[8,"סגנון לחימה מתקדם, שמשדרג סגנון שכבר נלמד (למשל התקפה ברוטלית ואכזרית או מכה מלומדת ומהירה)","מת' 12–13"],[11,"סגנון לחימה מתקדם נוסף","מת' 12"],[12,"אשפות נשק","מת' 13"],[14,"סגנון לחימה מתקדם נוסף","מת' 12"]],
  wizard:[[1,"ספר לחשים: מכינים לחשים מהספר בכל בוקר, ואותו לחש אפשר להכין כמה פעמים","ש 30"],[6,"לחשים מעוצמה 6 דורשים ספר לחשים עמיד (כ־250 מ״ז, או כ־150 בהכנה עצמית); עוצמה 7 ספר מיוחד (כ־2,500 מ״ז) עם דיו תמנונים","מת' 15"],[15,"לחשים קמאיים (עוצמה 8): ספר קמאי (50,000+ מ״ז) ודיו דיונון ענק","מת' 16–17"]],
@@ -2563,6 +2682,7 @@ const maxLevel=cls=>PROG[cls]?PROG[cls].xp.length:1;
 const lvlOf=c=>Math.max(1,Math.min(maxLevel(c.cls),Number(c.level)||1));
 
 function sheetInit(){
+  rollBind();
   const ab=$("shAbil"); ab.innerHTML="";
   for(const [k,label] of ABIL){
     const d=document.createElement("div"); d.className="abt";
@@ -2587,6 +2707,7 @@ function sheetInit(){
   $("shAge").addEventListener("input",e=>{cur().age=e.target.value;schedule();});
   $("shSex").addEventListener("change",e=>{cur().sex=e.target.value;schedule();renderAll();});
   $("shNotes").addEventListener("input",e=>{cur().notes=e.target.value;schedule();});
+  $("shBg").addEventListener("input",e=>{cur().bg=e.target.value;schedule();});
   $("hpRoll").onclick=()=>{
     const c=cur(),P=PROG[c.cls]; if(!P) return;
     const go=()=>{const m=mods(c);const rolls=[];let r;for(let t=0;t<3;t++){r=1+Math.floor(Math.random()*P.die);rolls.push(r);if(r!==1)break;}
@@ -2608,7 +2729,8 @@ function sheetFill(){
   sl.value=lvlOf(c);
   setVal("shXP",c.xp||0); $("shAlign").value=c.align||"";
   for(const [k] of ABIL) setVal("ab-"+k,clampA(c[k]));
-  clampHP(c); setVal("shHP",c.hp); setVal("shHPmax",c.hpMax); $("shHP").max=c.hpMax??""; setVal("shLangs",c.langs); setVal("shNotes",c.notes);
+  { const n=$("shRollNote"); if(n) n.textContent=rollNote(c); }
+  clampHP(c); setVal("shHP",c.hp); setVal("shHPmax",c.hpMax); $("shHP").max=c.hpMax??""; setVal("shLangs",c.langs); setVal("shNotes",c.notes); setVal("shBg",c.bg);
   setVal("shPlayer",c.player); setVal("shAge",c.age); $("shSex").value=c.sex||"";
   const bg=G(c,"בוגר","בוגרת"); $("shAge").placeholder=c.cls==="elf"?bg+" בגיל 100":["halfling","bard"].includes(c.cls)?bg+" בגיל 30":c.cls==="dwarf"?bg+" בגיל 50":"";
   $("shAge").title=c.cls==="elf"?"אלף נחשב בוגר בגיל 100 (ש 37)":["halfling","bard"].includes(c.cls)?"בן מחצית נחשב בוגר בגיל 30 (ש 38)":c.cls==="dwarf"?"גמד נחשב בוגר בגיל 50 (ש 39)":"";
@@ -2690,7 +2812,7 @@ function sheetDerived(){
   if(hasI(c,"oil")) rows.push(["שמן מנורות (השלכה)","הטלה",sgn(base+m.missile),"1ק4","+1 נזק בכל אחד משני הסיבובים הבאים (ש 43)"]);
   if(hasI(c,"holywater")) rows.push(["מים קדושים","התזה",sgn(base+m.missile),"1ק6","רק נגד רוב האל־מתים והשדים (ש 43)"]);
   $("shWeapons").innerHTML=rows.length?`<div class="tw"><table><thead><tr><th>נשק</th><th>סוג וטווח</th><th>פגיעה</th><th>נזק</th><th>הערות</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="num"><b>${r[2]}</b></td><td class="num"><b>${r[3]}</b></td><td class="muted">${r[4]}</td></tr>`).join("")}</tbody></table></div>
-    <p class="muted small">פגיעה = ק20 + התוסף, שווה או גבוה מהדרג״ש של היריב. חוק בית: 20 טבעי פוגע ומכפיל נזק, 1 טבעי משתבש (ש 62).${c.cls==="thief"?` ${G(c,"גנב","גנבת")} מאחור: +4 לפגיעה ונזק ${L>=5?"משולש":"כפול"}.`:" מאחור: +2 לפגיעה."}</p>`
+    <p class="muted small">פגיעה = ק20 + התוסף, שווה או גבוה מהדרג״ש של היריב. חוק בית: 20 טבעי פוגע ומכפיל נזק, 1 טבעי משתבש (ש 62).${c.cls==="thief"?` ${G(c,"גנב","גנבת")} מאחור: +4 לפגיעה ונזק ${L>=15?"פי 5":L>=10?"פי 4":L>=5?"משולש":"כפול"} (ש 24, מת' 5).`:" מאחור: +2 לפגיעה."}</p>`
     :'<p class="muted">אין נשק בסל. אפשר לקנות בחנות.</p>';
   /* class abilities */
   const ab=(ABIL_TEXT[c.cls]||[]).map(([lv,txt,src])=>`<li class="${lv>L?"later":""}">${lv>1?`<span class="lv">דרגה ${lv}</span>`:""}${femTxt(c,txt)} <small>(${src})</small></li>`);
