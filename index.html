@@ -2276,7 +2276,7 @@ function sheetPrintHTML(c){
   const abil=ABIL.map(([k,n])=>({n,v:clampA(c[k]),prime:!!(P&&P.prime.includes(k)),mods:q("#abm-"+k+" span").map(e=>tx(e.textContent)).filter(x=>x&&x!=="—")}));
   const svRow=P?P.saves.find(([max])=>L<=max)[1]:[];
   const wrows=q("#shWeapons tbody tr").map(tr=>q("td",tr).map(td=>{const d=td.cloneNode(true); d.querySelectorAll(".tag").forEach(x=>x.remove()); return tx(d.textContent);}));
-  const abl=q("#shAbilities li:not(.later)").map(li=>tx(li.textContent)).filter(x=>x&&x!=="בחרו סוג דמות.");
+  const abl=q("#shAbilities li:not(.later)").map(li=>{ const lv=li.querySelector(".lv"); return tx((lv?lv.textContent+": ":"")+[...li.childNodes].filter(n=>n!==lv).map(n=>n.textContent).join("")); }).filter(x=>x&&x!=="בחרו סוג דמות.");
   const skl=SKILLS[c.cls]?q("#shSkills .skl > div").map(d=>[tx(d.children[0].textContent),tx(d.children[1].textContent)]):[];
   const perDay=q("#shSpells .spl > div").map(d=>`${tx(d.children[0].textContent)} ${tx(d.children[1].textContent)}`);
   const known=isBookCls(c)?(c.book||[]).map(id=>WSP_BY[id]).filter(Boolean).sort((a,b)=>a[0]-b[0]):[];
@@ -2334,7 +2334,7 @@ function sheetPrintHTML(c){
 .back .por{width:90mm;height:118mm;margin:4mm auto 2mm;border:1.8px solid #111;border-radius:4mm;display:grid;place-items:center;overflow:hidden}
 .back .por img{width:100%;height:100%;object-fit:contain;filter:grayscale(1)}
 .back .por .ph{color:#777;font-size:10pt;text-align:center;padding:8mm}
-.foot{position:absolute;bottom:3mm;inset-inline:0;text-align:center;font-size:7pt;color:#666}`;
+.pr-foot{position:absolute;bottom:3.5mm;left:12mm;right:12mm;display:block;text-align:center;font-size:6.5pt;line-height:1.2;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;padding:0;margin:0}`;
   const pos=c.portrait?(c.prPos||"front"):"none";
   const front=`<section class="pg">${pos==="bg"?`<div class="wm"><img src="${c.portrait}" alt=""></div>`:""}
     <div class="hd"><div class="brand"><h1>חרבות וכשפים</h1>${prRibbon("דף הדמות")}${pos==="front"?`<div class="por1"><img src="${c.portrait}" alt=""></div>`:""}</div>
@@ -2360,14 +2360,14 @@ function sheetPrintHTML(c){
       <div class="col">${prRibbon("ציוד נוסף")}${list(gear,1)}<div class="fill"></div>
         <div class="money">${[["מ״ז",gp],["מ״כ",sp],["מ״נ",cpn]].map(([k,v])=>`<div><b>${v}</b><span>${k}</span></div>`).join("")}</div></div>
     </div>
-    <div class="foot">${esc(c.name||"")} · הודפס מאפליקציית החבורה · לפי דף הדמות בחוברת לשחקן המתחיל (ש 69–70)</div></section>`;
+    <div class="pr-foot">${esc(c.name||"")} · הודפס מאפליקציית החבורה · לפי דף הדמות בחוברת לשחקן המתחיל (ש 69–70)</div></section>`;
   const back=`<section class="pg back">
     <div class="hd"><div class="flds" style="padding-top:0">${field("שם השחקן",c.player)}${field("שם הדמות",c.name)}</div></div>
     ${pos==="front"||pos==="bg"?"":`<div class="por">${c.portrait?`<img src="${c.portrait}" alt="">`:`<div class="ph">איור הדמות</div>`}</div>`}
     ${prRibbon("רקע")}${c.bg?`<p class="sm" style="white-space:pre-wrap">${esc(c.bg)}</p><div class="fill" style="flex:${pos==="front"||pos==="bg"?1.4:.6}"></div>`:(pos==="front"||pos==="bg"?'<div class="fill" style="flex:1.4"></div>':lines(7))}
     <p class="sm"><b>שפות:</b> ${(langMigrate(c),esc(langAll(c).join(", ")))}</p>
     ${prRibbon("הערות")}${c.notes?`<p class="sm" style="white-space:pre-wrap">${esc(c.notes)}</p>`:""}<div class="fill" style="margin-bottom:5mm"></div>
-    <div class="foot">${esc(c.name||"")} · עמוד 2</div></section>`;
+    <div class="pr-foot">${esc(c.name||"")} · עמוד 2</div></section>`;
   return {css,body:`<div class="prs">${front}${back}</div>`};
 }
 /* print dialog */
@@ -2455,17 +2455,29 @@ async function prGenHF(c,say){
   }catch(e){ say("לא הצלחתי לקרוא את התמונה שהתקבלה. נסו שוב."); }
   finally{ PR_BUSY=false; const g=$("prGen"), a=$("prAgain"); if(g) g.disabled=frozen(); if(a) a.disabled=false; }
 }
+/* a long list (a high-level character's abilities) must not run under the footer: shrink that list's type until its last line fits */
+function prFit(root){
+  var mm=96/25.4;
+  root.querySelectorAll(".pg").forEach(function(pg){
+    var R=pg.getBoundingClientRect(); if(!R.height) return; var lim=R.bottom-9.5*mm;
+    pg.querySelectorAll(".ls,.sk").forEach(function(u){
+      var fs=parseFloat(getComputedStyle(u).fontSize), last=u.lastElementChild, n=0;
+      while(last&&last.getBoundingClientRect().bottom>lim&&fs>7.4&&n<25){ fs-=.35; u.style.fontSize=fs+"px"; u.style.lineHeight="1.25"; n++; }
+    });
+  });
+}
 function prPrint(){
   const {css,body}=sheetPrintHTML(cur()); let root=$("printRoot");
   if(!root){ root=document.createElement("div"); root.id="printRoot"; document.body.appendChild(root); }
   root.innerHTML=`<style>${css}</style>${body}`; document.body.classList.add("printing"); prClose();
+  try{ root.style.cssText="display:block;position:absolute;left:-10000px;top:0;visibility:hidden"; prFit(root); }catch(e){} root.style.cssText="";
   /* the sheet's styles share class names with the app (.brand and others), so they leave the page as soon as printing ends */
   const done=()=>{ document.body.classList.remove("printing"); window.removeEventListener("afterprint",done); root.innerHTML=""; };
   window.addEventListener("afterprint",done); setTimeout(()=>{ try{ window.print(); }catch(e){} setTimeout(done,1500); },120);
 }
 async function prDownload(){
   const c=cur(), {css,body}=sheetPrintHTML(c);
-  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(c.name||"דמות")} · דף דמות</title><style>${css}@media screen{body{padding:8mm 0;background:#eee}.pg{margin-bottom:8mm}}</style></head><body>${body}<script>addEventListener("load",()=>setTimeout(()=>print(),300));<\/script></body></html>`;
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(c.name||"דמות")} · דף דמות</title><style>${css}@media screen{body{padding:8mm 0;background:#eee}.pg{margin-bottom:8mm}}</style></head><body>${body}<script>${prFit.toString()};addEventListener("load",()=>{ try{ prFit(document); }catch(e){} setTimeout(()=>print(),300); });<\/script></body></html>`;
   const name=`דף-דמות-${(c.name||"דמות").replace(/[\\/:*?"<>|\s]+/g,"-")}.html`; let dl=null;
   try{dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;}catch(e){dl=null;}
   if(dl){ try{ await dl.save({filename:name,data:html,mimeType:"text/html"}); toast("הקובץ נשמר. פותחים אותו והוא נשלח להדפסה"); prClose(); return; }catch(e){ if(e&&e.code==="declined"){ toast("השמירה בוטלה"); return; } } }
