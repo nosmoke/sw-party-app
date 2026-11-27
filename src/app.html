@@ -248,6 +248,9 @@ body.bked-open .scrim{z-index:80}
 .ed-lock{margin:8px 12px 0;padding:6px 10px;border-radius:8px;background:#f6e7c8;font-size:.88rem}
 .ed-form{display:flex;flex-wrap:wrap;gap:8px}.ed-form h3{width:100%;margin:10px 0 2px}
 .ed-f{display:flex;flex-direction:column;gap:2px;font-size:.82rem;flex:1 1 140px}.ed-f.wide{flex-basis:100%}
+.ed-c input{width:auto!important}
+.ed-c{flex-direction:row;align-items:center;gap:6px;flex:0 0 auto;align-self:end;padding-bottom:4px}
+.ed-f select{font:inherit;font-size:.92rem;width:100%}
 .ed-f input,.ed-f textarea{font:inherit;font-size:.92rem;width:100%;box-sizing:border-box}
 .ed-arr{width:100%;display:flex;flex-direction:column;gap:8px}
 .ed-row{position:relative;display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px 8px 8px 34px;margin:0}
@@ -4589,6 +4592,15 @@ const canEditBook=id=>!!(LIB_ON()&&gGoogle()&&QRAW[id]&&QMETA[id]&&(EXT.isAdmin(
 const ED_MON=[["name","שם","t"],["count","כמות","n"],["hd","קב״פ","t"],["hp","נק״פ קבועות","n"],["ac","דרג״ש","n"],["atk","התקפה","t"],["save","הצלה","n"],["move","תנועה","t"],["xp","נק״ן","n"],["special","מיוחד","a"]];
 const ED_TRAP=[["name","שם","t"],["dmg","נזק (למשל 1ק6)","t"],["text","תיאור","a"]];
 const ED_TRE=[["name","שם","t"],["gp","שווי לחלוקה במ״ז","n"],["qty","כמות","n"],["text","תיאור","a"]];
+const ED_GOAL=[["name","מטרה","t"],["xp","נק״ן","n"],["perChar","לכל דמות","c"],["page","עמוד","t"]];
+const ED_FLAG=[["name","אירוע","t"],["page","עמוד","t"]];
+/* room events and notes pick their event and room from lists, so nothing can point at an id that does not exist */
+const edFlagOpts=raw=>[["","— בלי —"],...(raw.flags||[]).map(f=>[f.id,f.name||f.id])];
+const edRoomOpts=raw=>[["","— בלי —"],...(raw.rooms||[]).map(r=>[r.id,`${r.id}. ${r.name||""}`])];
+const ED_EV=raw=>[["text","מה קורה","a"],["flag","מסמן אירוע","s",edFlagOpts(raw)],["fight.from","מצטרף לקרב: המפלצות מחדר","s",edRoomOpts(raw)],["fight.label","שם הכפתור לקרב","t"]];
+const ED_NOTE=raw=>[["flag","כשהאירוע מסומן","s",edFlagOpts(raw).slice(1)],["text","ההערה בחדר","a"]];
+const edGet=(o,k)=>k.split(".").reduce((x,p)=>x==null?x:x[p],o);
+function edSet(o,k,v){ const ps=k.split("."), last=ps.pop(); let x=o; for(const p of ps){ if(v===undefined&&(x[p]==null)) return; x=x[p]=x[p]&&typeof x[p]==="object"?x[p]:{}; } if(v===undefined) delete x[last]; else x[last]=v; }
 async function edOpen(id,mode,sel){
   if(!QRAW[id]||!QBOOKS[id]||QBOOKS[id]._pub){ toast("טוען את הספר…"); delete QBOOKS[id]; await qLoadBook(id); }
   const b=QBOOKS[id]; if(!b||b._pub){ toast("אין לך גישה לספר המלא"); return; }
@@ -4602,6 +4614,8 @@ function edView(b,rid){
   if(rid==="__intro"){ const I=b.intro||{};
     return `<h2>${esc(b.title)}</h2>${b.source||b.levels?`<p class="muted small">${esc([b.source,b.levels].filter(Boolean).join(" · "))}</p>`:""}${b.summary?`<p>${esc(b.summary)}</p>`:""}
       ${I.read?`<div class="q-read"><span class="lbl">להקראה</span>${esc(I.read)}</div>`:""}${(I.dm||[]).length?`<h3>למנחה</h3><ul class="q-dm">${I.dm.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+      ${(b.goals||[]).length?`<h3>מטרות ונק״ן</h3><ul class="q-dm">${b.goals.map(g=>`<li>${esc(g.name)}: ${esc(String(g.xp||0))} נק״ן${g.perChar?" לכל דמות":""}${g.page?` <small class="muted">(${esc(g.page)})</small>`:""}</li>`).join("")}</ul>`:""}
+      ${(b.flags||[]).length?`<h3>אירועים</h3><ul class="q-dm">${b.flags.map(x=>`<li>${esc(x.name)}${x.page?` <small class="muted">(${esc(x.page)})</small>`:""}</li>`).join("")}</ul>`:""}
       ${b.after?`<h3>אחרי ההרפתקה</h3><p>${esc(b.after)}</p>`:""}`; }
   const r=(b.rooms||[]).find(x=>x.id===rid); if(!r) return "";
   const mon=(r.monsters||[]).map(m=>`<li><b>${esc(m.name)}</b>${(m.count||1)>1?` ×${m.count}`:""} <span class="muted small">${[m.hd!=null&&m.hd!==""?"קב״פ "+m.hd:"",m.hp?"נק״פ "+m.hp:"",m.ac!=null?"דרג״ש "+m.ac:"",m.atk||"",m.save?"הצלה "+m.save:"",m.move?"תנועה "+m.move:"",m.xp?m.xp+" נק״ן":""].filter(Boolean).map(esc).join(" · ")}</span>${m.special?`<div class="small">${esc(m.special)}</div>`:""}</li>`).join("");
@@ -4612,41 +4626,68 @@ function edView(b,rid){
     ${mon?`<h3>מפלצות</h3><ul class="q-dm">${mon}</ul>`:""}
     ${(r.traps||[]).length?`<h3>מלכודות</h3><ul class="q-dm">${r.traps.map(t=>`<li><b>${esc(t.name)}</b>${t.dmg?` <span class="muted small">(${esc(t.dmg)})</span>`:""} ${esc(t.text||"")}</li>`).join("")}</ul>`:""}
     ${(r.treasure||[]).length?`<h3>אוצר</h3><ul class="q-dm">${r.treasure.map(t=>`<li><b>${esc(t.name)}</b>${t.gp?` <span class="muted small">(${t.gp} מ״ז)</span>`:""} ${esc(t.text||"")}</li>`).join("")}</ul>`:""}
-    ${(r.events||[]).length?`<h3>אירועים</h3><ul class="q-dm">${r.events.map(x=>`<li>${esc(x.text||"")}</li>`).join("")}</ul>`:""}`;
+    ${(r.events||[]).length?`<h3>אירועים בחדר</h3><ul class="q-dm">${r.events.map(x=>{ const fl=(b.flags||[]).find(f=>f.id===x.flag), fr=x.fight&&(b.rooms||[]).find(q=>q.id===x.fight.from);
+      return `<li>${esc(x.text||"")}${fl?` <span class="muted small">⚑ מסמן: ${esc(fl.name)}</span>`:""}${fr?` <span class="muted small">⚔ מצטרפות המפלצות מחדר ${esc(fr.id)}</span>`:""}</li>`; }).join("")}</ul>`:""}
+    ${Object.keys(r.flagNotes||{}).length?`<h3>הערות כשאירוע מסומן</h3><ul class="q-dm">${Object.entries(r.flagNotes).map(([k,v])=>{ const fl=(b.flags||[]).find(f=>f.id===k); return `<li><b>${esc(fl?fl.name:k)}:</b> ${esc(v)}</li>`; }).join("")}</ul>`:""}`;
 }
 function edRows(arr,list,fields,add){
   return `<div class="ed-arr" data-arr="${arr}">${(list||[]).map((o,j)=>`<fieldset class="ed-row" data-j="${j}"><button type="button" class="btn small ghost ed-del" data-ed="del" title="הסרה">✕</button>
-      ${fields.map(([k,l,t])=>`<label class="ed-f${t==="a"?" wide":""}"><span>${l}</span>${t==="a"?`<textarea data-k="${k}" rows="2">${esc(o[k]==null?"":o[k])}</textarea>`:`<input data-k="${k}" ${t==="n"?'inputmode="decimal"':""} value="${esc(o[k]==null?"":o[k])}">`}</label>`).join("")}</fieldset>`).join("")}
+      ${fields.map(([k,l,t,opt])=>{ const v=edGet(o,k);
+        if(t==="c") return `<label class="ed-f ed-c"><input type="checkbox" data-k="${k}" ${v?"checked":""}> <span>${l}</span></label>`;
+        if(t==="s") return `<label class="ed-f"><span>${l}</span><select data-k="${k}">${opt.map(([ov,ol])=>`<option value="${esc(ov)}" ${String(v==null?"":v)===String(ov)?"selected":""}>${esc(ol)}</option>`).join("")}</select></label>`;
+        return `<label class="ed-f${t==="a"?" wide":""}"><span>${l}</span>${t==="a"?`<textarea data-k="${k}" rows="2">${esc(v==null?"":v)}</textarea>`:`<input data-k="${k}" ${t==="n"?'inputmode="decimal"':""} value="${esc(v==null?"":v)}">`}</label>`; }).join("")}</fieldset>`).join("")}
     <button type="button" class="btn small" data-ed="add" data-arr="${arr}">${add}</button></div>`;
 }
 function edForm(raw,rid){
   const ta=(k,l,v,rows)=>`<label class="ed-f wide"><span>${l}</span><textarea data-k="${k}" rows="${rows||3}">${esc(v||"")}</textarea></label>`, inp=(k,l,v)=>`<label class="ed-f wide"><span>${l}</span><input data-k="${k}" value="${esc(v||"")}"></label>`;
   if(rid==="__intro"){ const I=raw.intro||{};
-    return `<div class="ed-form" data-sec="__intro">${inp("title","שם ההרפתקה",raw.title)}${ta("summary","תקציר",raw.summary,4)}${ta("intro.read","פתיחה להקראה",I.read,4)}${ta("intro.dm","פתיחה למנחה (הערה בכל שורה)",edLines(I.dm),6)}${ta("after","אחרי ההרפתקה",raw.after,3)}</div>`; }
+    return `<div class="ed-form" data-sec="__intro">${inp("title","שם ההרפתקה",raw.title)}${ta("summary","תקציר",raw.summary,4)}${ta("intro.read","פתיחה להקראה",I.read,4)}${ta("intro.dm","פתיחה למנחה (הערה בכל שורה)",edLines(I.dm),6)}${ta("after","אחרי ההרפתקה",raw.after,3)}
+      <h3>מטרות ונק״ן</h3>${edRows("goals",raw.goals,ED_GOAL,"+ מטרה")}
+      <h3>אירועים</h3><p class="muted small">אירועים שהמנחה מסמנת שקרו. אירוע חדש אפשר לבחור בחדרים אחרי השמירה.</p>${edRows("flags",raw.flags,ED_FLAG,"+ אירוע")}</div>`; }
   const r=raw.rooms.find(x=>x.id===rid);
   return `<div class="ed-form" data-sec="${esc(rid)}"><p class="muted small">חדר ${esc(rid)}. אי אפשר לשנות את מספר החדר, כי ההתקדמות במשחקים שמורה לפיו.</p>
     ${inp("name","שם החדר",r.name)}${ta("read","להקראה",r.read,4)}${ta("dm","למנחה (הערה בכל שורה)",edLines(r.dm),6)}${ta("secret","סודי",r.secret,2)}${inp("exits","יציאות",r.exits)}
     <h3>מפלצות</h3>${edRows("monsters",r.monsters,ED_MON,"+ מפלצת")}
     <h3>מלכודות</h3>${edRows("traps",r.traps,ED_TRAP,"+ מלכודת")}
-    <h3>אוצר</h3>${edRows("treasure",r.treasure,ED_TRE,"+ פריט אוצר")}</div>`;
+    <h3>אוצר</h3>${edRows("treasure",r.treasure,ED_TRE,"+ פריט אוצר")}
+    <h3>אירועים בחדר</h3>${edRows("events",r.events,ED_EV(raw),"+ אירוע בחדר")}
+    <h3>הערות כשאירוע מסומן</h3>${(raw.flags||[]).length?edRows("flagNotes",Object.entries(r.flagNotes||{}).map(([flag,text])=>({flag,text})),ED_NOTE(raw),"+ הערה"):`<p class="muted small">אין בספר אירועים. מוסיפים אותם ב"פתיחה וסיכום".</p>`}</div>`;
 }
-/* reads the form into a new copy of the raw book; fields the form does not show (adjust, hits, ref, item…) are kept */
+/* reads one list of rows; each row keeps the fields the form does not show (adjust, hits, ref, item, id…) */
+function edArr(f,arr,fields,old,req){
+  const out=[];
+  f.querySelectorAll(`[data-arr="${arr}"] > .ed-row`).forEach(row=>{ const j=row.dataset.j, o=j!==""&&old[j]?JSON.parse(JSON.stringify(old[j])):{};
+    for(const [k,,t] of fields){ const el=row.querySelector(`[data-k="${k}"]`); if(!el) continue;
+      if(t==="c"){ edSet(o,k,el.checked?true:undefined); continue; }
+      const v=el.value.trim(); edSet(o,k,v===""?undefined:(t==="n"&&!isNaN(Number(v))?Number(v):v)); }
+    if(o.fight&&!o.fight.from) delete o.fight;
+    if(req(o)) out.push(o); });
+  return out;
+}
+const edNewId=(list,pre)=>{ let n=1; while(list.some(x=>x.id===pre+n)) n++; return pre+n; };
+/* reads the form into a new copy of the raw book; fields the form does not show are kept */
 function edCollect(){
   const raw=JSON.parse(JSON.stringify(QRAW[ED.id])), f=$("bkEd").querySelector(".ed-form"), val=k=>{ const e=f.querySelector(`:scope > label [data-k="${k}"]`); return e?e.value:""; };
   const setS=(o,k,v)=>{ v=String(v).trim(); if(v) o[k]=v; else delete o[k]; };
   if(ED.sel==="__intro"){ const t=val("title").trim(); if(t) raw.title=t; setS(raw,"summary",val("summary")); setS(raw,"after",val("after"));
-    raw.intro=raw.intro||{}; setS(raw.intro,"read",val("intro.read")); const dm=edUnlines(val("intro.dm")); if(dm.length) raw.intro.dm=dm; else delete raw.intro.dm; return raw; }
+    raw.intro=raw.intro||{}; setS(raw.intro,"read",val("intro.read")); const dm=edUnlines(val("intro.dm")); if(dm.length) raw.intro.dm=dm; else delete raw.intro.dm;
+    const goals=edArr(f,"goals",ED_GOAL,raw.goals||[],o=>!!o.name); for(const g of goals){ if(!g.id) g.id=edNewId(goals,"goal"); if(g.xp==null) g.xp=0; }
+    const flags=edArr(f,"flags",ED_FLAG,raw.flags||[],o=>!!o.name); for(const x of flags) if(!x.id) x.id=edNewId(flags,"event");
+    if(goals.length) raw.goals=goals; else raw.goals=[];
+    if(flags.length) raw.flags=flags; else delete raw.flags;
+    /* an event that was removed: nothing in the rooms may point at it any more */
+    const keep=new Set(flags.map(x=>x.id));
+    for(const r of raw.rooms||[]){ if(r.events){ for(const ev of r.events) if(ev.flag&&!keep.has(ev.flag)) delete ev.flag; }
+      if(r.flagNotes){ for(const k of Object.keys(r.flagNotes)) if(!keep.has(k)) delete r.flagNotes[k]; if(!Object.keys(r.flagNotes).length) delete r.flagNotes; } }
+    return raw; }
   const r=raw.rooms.find(x=>x.id===ED.sel);
   setS(r,"name",val("name")); setS(r,"read",val("read")); setS(r,"secret",val("secret")); setS(r,"exits",val("exits"));
   const dm=edUnlines(val("dm")); if(dm.length) r.dm=dm; else delete r.dm;
   for(const [arr,fields] of [["monsters",ED_MON],["traps",ED_TRAP],["treasure",ED_TRE]]){
-    const old=r[arr]||[], out=[];
-    f.querySelectorAll(`[data-arr="${arr}"] > .ed-row`).forEach(row=>{ const j=row.dataset.j, o=j!==""&&old[j]?JSON.parse(JSON.stringify(old[j])):{};
-      for(const [k,,t] of fields){ const v=row.querySelector(`[data-k="${k}"]`).value.trim();
-        if(v==="") delete o[k]; else if(t==="n"&&!isNaN(Number(v))) o[k]=Number(v); else o[k]=v; }
-      if(o.name) out.push(o); });
-    if(out.length) r[arr]=out; else delete r[arr];
-  }
+    const out=edArr(f,arr,fields,r[arr]||[],o=>!!o.name); if(out.length) r[arr]=out; else delete r[arr]; }
+  const evs=edArr(f,"events",ED_EV(raw),r.events||[],o=>!!o.text); if(evs.length) r.events=evs; else delete r.events;
+  if(f.querySelector('[data-arr="flagNotes"]')){ const notes=edArr(f,"flagNotes",ED_NOTE(raw),Object.entries(r.flagNotes||{}).map(([flag,text])=>({flag,text})),o=>!!(o.flag&&o.text));
+    if(notes.length) r.flagNotes=Object.fromEntries(notes.map(n=>[n.flag,n.text])); else delete r.flagNotes; }
   return raw;
 }
 function edRender(){
@@ -4673,19 +4714,30 @@ async function edClick(e){
   if(a==="cancel"){ if(ED.mode==="run") return edClose(); ED.edit=false; return edRender(); }
   if(a==="prev"||a==="next"){ const ids=["__intro",...b.rooms.map(r=>r.id)], i=ids.indexOf(ED.sel)+(a==="next"?1:-1); if(i>=0&&i<ids.length){ ED.sel=ids[i]; edRender(); $("bkEd").querySelector(".bked-body").scrollTop=0; } return; }
   if(a==="del"){ t.closest(".ed-row").remove(); return; }
-  if(a==="add"){ const arr=t.dataset.arr, fields=arr==="monsters"?ED_MON:arr==="traps"?ED_TRAP:ED_TRE, box=t.parentElement, tmp=document.createElement("div");
-    tmp.innerHTML=edRows(arr,[{}],fields,"").replace(/data-j="0"/,'data-j=""'); const row=tmp.querySelector(".ed-row"); box.insertBefore(row,t); row.querySelector("input").focus(); return; }
+  if(a==="add"){ const arr=t.dataset.arr, raw=QRAW[ED.id], fields={monsters:ED_MON,traps:ED_TRAP,treasure:ED_TRE,goals:ED_GOAL,flags:ED_FLAG,events:ED_EV(raw),flagNotes:ED_NOTE(raw)}[arr], box=t.parentElement, tmp=document.createElement("div");
+    tmp.innerHTML=edRows(arr,[{}],fields,"").replace(/data-j="0"/,'data-j=""'); const row=tmp.querySelector(".ed-row"); box.insertBefore(row,t); const fe=row.querySelector("input:not([type=checkbox]),textarea,select"); if(fe) fe.focus(); return; }
   if(a==="save"){ let raw; try{ raw=edCollect(); }catch(x){ console.warn(x); toast("קריאת הטופס נכשלה"); return; }
     /* monsters the party already defeated in this game are counted by name: a rename carries the count over in this game */
     const moves=[]; const q=qst(), rs=ED.sel!=="__intro"&&q.active===ED.id?((q.by[ED.id]||{}).rooms||{})[ED.sel]:null;
     if(rs&&rs.killed){ const oldR=QRAW[ED.id].rooms.find(x=>x.id===ED.sel), newR=raw.rooms.find(x=>x.id===ED.sel), nm=(newR.monsters||[]).map(m=>m.name);
       for(const [j,m] of (oldR.monsters||[]).entries()) if(rs.killed[m.name]>0&&!nm.includes(m.name)) moves.push([m.name,(newR.monsters||[])[j]&&newR.monsters[j].name,rs.killed[m.name]]); }
+    const warn=[];
+    if(ED.sel==="__intro"){ const st=(qst().by||{})[ED.id], old=QRAW[ED.id], gNew=new Set((raw.goals||[]).map(g=>g.id)), fNew=new Set((raw.flags||[]).map(x=>x.id));
+      const gGone=(old.goals||[]).filter(g=>!gNew.has(g.id)), fGone=(old.flags||[]).filter(x=>!fNew.has(x.id));
+      const gMarked=gGone.filter(g=>st&&st.goals&&st.goals[g.id]), fMarked=fGone.filter(x=>st&&st.flags&&st.flags[x.id]);
+      if(gMarked.length) warn.push(`מטרות שכבר סומנו כהושגו במשחק הזה: ${gMarked.map(g=>g.name).join(", ")}. הסימון שלהן לא יוצג יותר.`);
+      if(fMarked.length) warn.push(`אירועים שכבר סומנו במשחק הזה: ${fMarked.map(x=>x.name).join(", ")}. הסימון שלהם לא יוצג יותר.`);
+      const used=fGone.filter(x=>(old.rooms||[]).some(r=>(r.events||[]).some(ev=>ev.flag===x.id)||(r.flagNotes&&r.flagNotes[x.id])));
+      if(used.length) warn.push(`אירועים שחדרים מפנים אליהם: ${used.map(x=>x.name).join(", ")}. ההפניות בחדרים יוסרו.`);
+      if(gGone.length+fGone.length&&!warn.length) warn.push(`${[...gGone.map(g=>"המטרה \""+g.name+"\""),...fGone.map(x=>"האירוע \""+x.name+"\"")].join(", ")} יימחקו מהספר.`);
+      if(gGone.length+fGone.length) warn.push("במשחקים אחרים שמריצים את הספר, סימון שלהם לא יוצג יותר."); }
     const go=async()=>{ try{ t.disabled=true; await edSave(raw);
         if(moves.length&&rs){ for(const [o2,n2,k] of moves){ if(n2) rs.killed[n2]=(rs.killed[n2]||0)+k; delete rs.killed[o2]; } schedule(); }
         toast("הספר נשמר בספרייה"); if(ED.mode==="run"){ edClose(); } else { ED.edit=false; edRender(); }
         if(typeof renderQuest==="function"&&!$("questPane")?.hidden) renderQuest(); }
       catch(x){ console.warn(x); t.disabled=false; toast("השמירה נכשלה. בדקו את החיבור ונסו שוב"); } };
-    if(moves.length) ask("לשנות שם של מפלצת שהובסה?",`במשחק הזה כבר הובסו בחדר: ${moves.map(([o2,,k])=>`${o2} (${k})`).join(", ")}. ${moves.every(m=>m[1])?"הספירה במשחק הזה תעבור לשם החדש.":"מפלצת שהוסרה מהחדר: הספירה שלה תימחק במשחק הזה."} במשחקים אחרים שמריצים את הספר, הספירה של השם הישן לא תופיע יותר.`,"שמירה",go);
+    if(warn.length) ask("למחוק מהספר?",warn.join(" "),"שמירה",go);
+    else if(moves.length) ask("לשנות שם של מפלצת שהובסה?",`במשחק הזה כבר הובסו בחדר: ${moves.map(([o2,,k])=>`${o2} (${k})`).join(", ")}. ${moves.every(m=>m[1])?"הספירה במשחק הזה תעבור לשם החדש.":"מפלצת שהוסרה מהחדר: הספירה שלה תימחק במשחק הזה."} במשחקים אחרים שמריצים את הספר, הספירה של השם הישן לא תופיע יותר.`,"שמירה",go);
     else go();
   }
 }
