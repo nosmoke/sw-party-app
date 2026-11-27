@@ -5261,7 +5261,7 @@ function questInit(){
         QZOOM=d===0?1:Math.max(1,Math.min(4,+(QZOOM*(d>0?1.5:1/1.5)).toFixed(2))); if(QZOOM<1.05) QZOOM=1; if(old===QZOOM) return;
         renderQuest(); const n=$("qMapView"); if(n){n.scrollLeft=cx*n.scrollWidth-n.clientWidth/2; n.scrollTop=cy*n.scrollHeight-n.clientHeight/2;} return;}
       case "room": QMAP=false; s.cur=t.dataset.id||null; if(s.cur){const r2=roomSt(b.id,s.cur);
-          if(!r2.st){ r2.st="seen"; const rm=adv().roomMin; if(rm){ toast(`חדר חדש: עברו ${rm} דקות`); advTime(rm*60,`חדר ${s.cur}`); } }}   /* exploring a new room takes time, when the tracker has a time per room */
+          if(!r2.st){ r2.st="seen"; const rm=adv().roomMin; if(rm){ toast(`חדר חדש: עברו ${rm} דקות`); advTime(rm*60,RREF(s.cur)); } }}   /* exploring a new room takes time, when the tracker has a time per room */
         schedule(); renderQuest(); $("qDetail")&&($("qDetail").scrollTop=0); return;
       case "time": advTime(Number(t.dataset.n)||600); break;
       case "st": rs.st=t.dataset.v; break;
