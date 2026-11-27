@@ -588,6 +588,21 @@ svg.d20{width:1.15em;height:1.15em;vertical-align:-.22em;fill:none;stroke:curren
 .sheet{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding-block:12px 32px}
 .sh-top,.sh-abil,.sh-combat,.sh-wide{grid-column:1/-1}
 .sh-top{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.sh-head{display:flex;gap:16px;align-items:flex-start}.sh-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.sh-por{flex:0 0 auto;width:124px;margin:0;display:flex;flex-direction:column;align-items:center;gap:0;position:relative}
+.sh-por .fr{width:124px;height:165px;border:2px solid var(--ink,#222);border-radius:10px;padding:3px;background:var(--panel);position:relative;display:block;cursor:pointer}
+.sh-por .fr:after{content:"";position:absolute;inset:2px;border:1px solid var(--ink,#222);border-radius:8px;pointer-events:none;opacity:.55}
+.sh-por .fr img{width:100%;height:100%;object-fit:cover;object-position:50% 20%;border-radius:7px;display:block}
+.sh-por .rb{margin-top:-11px;position:relative;z-index:1;background:#1b1b1b;color:#fff;font-size:.74rem;font-weight:700;padding:2px 12px;max-width:124px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:polygon(0 0,100% 0,94% 50%,100% 100%,0 100%,6% 50%)}
+.sh-por .ed{position:absolute;top:6px;inset-inline-start:6px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;font-size:.95rem;cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;padding:0}
+.sh-por:hover .ed,.sh-por .ed:focus-visible{opacity:1}
+@media (hover:none){.sh-por .ed{opacity:.9}}
+.sh-por .empty{width:124px;height:165px;border:2px dashed var(--line);border-radius:10px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted,#777);font:inherit;font-size:.82rem;cursor:pointer;padding:6px}
+.sh-por .empty svg{width:54px;height:54px;opacity:.45}
+.sh-por .empty:hover{border-color:var(--ink,#222);color:var(--ink,#222)}
+@media (max-width:860px){.sh-head{flex-direction:column-reverse;align-items:center}.sh-main{width:100%}.sh-por,.sh-por .fr,.sh-por .empty{width:96px}.sh-por .fr,.sh-por .empty{height:128px}.sh-por .rb{max-width:110px}}
+.por-view{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.82);display:grid;place-items:center;padding:20px;cursor:zoom-out}.por-view[hidden]{display:none}
+.por-view img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
 .sh-name{font-family:var(--font-display);font-size:1.7rem;border:0;border-bottom:1px dashed var(--line);border-radius:0;padding:0 2px;background:transparent;width:100%;max-width:18em}
 .sh-sub{color:var(--accent);font-weight:600}
 .sh-xp{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;font-size:.86rem;color:var(--muted)}
@@ -913,7 +928,7 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
 
   <section id="sheetPane" hidden aria-label="דף הדמות">
     <div class="sheet">
-      <div class="sh-top">
+      <div class="sh-top"><div class="sh-head"><div class="sh-main">
         <div class="sh-id">
           <input type="text" id="shName" class="sh-name" maxlength="40" aria-label="שם הדמות">
           <div id="shTitle" class="sh-sub"></div>
@@ -930,7 +945,7 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
         </div>
         <div class="sh-xp" id="shXPinfo"></div>
         <div class="dn small" id="shAlignWarn" hidden></div>
-      </div>
+      </div><figure class="sh-por" id="shPor"></figure></div></div>
 
       <section class="sbox sh-abil"><h3>תכונות <small>ש 19–22</small> <button class="btn small rl-btn" id="rollBtn" type="button"><svg class="d20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2L21 7V17L12 22L3 17V7Z M12 6.5L17.2 15.5H6.8Z M12 2V6.5 M3 7L12 6.5L21 7 M3 7L6.8 15.5 M21 7L17.2 15.5 M3 17L6.8 15.5 M21 17L17.2 15.5 M12 22L6.8 15.5 M12 22L17.2 15.5"/></svg> גלגול תכונות</button></h3><div class="abil" id="shAbil"></div><p class="muted small rl-note" id="shRollNote"></p></section>
 
@@ -1020,6 +1035,14 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
   <ul id="relList"></ul>
 </section>
 
+<div class="scrim" id="porScrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="porTitle">
+    <h3 id="porTitle">איור הדמות</h3>
+    <div id="porBody"></div>
+    <div class="acts"><button class="btn" id="porClose">סגירה</button></div>
+  </div>
+</div>
+<div class="por-view" id="porView" hidden role="dialog" aria-modal="true" aria-label="איור הדמות"><img id="porViewImg" alt=""></div>
 <div class="scrim" id="scrim" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
     <h3 id="dlgTitle"></h3>
@@ -2935,7 +2958,7 @@ function sheetPrintHTML(c){
 .back .por img{width:100%;height:100%;object-fit:contain;filter:grayscale(1)}
 .back .por .ph{color:#777;font-size:10pt;text-align:center;padding:8mm}
 .pr-foot{position:absolute;bottom:3.5mm;left:12mm;right:12mm;display:block;text-align:center;font-size:6.5pt;line-height:1.2;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;padding:0;margin:0}`;
-  const pos=c.portrait?(c.prPos||"front"):"none";
+  const pos=c.portrait&&c.prPos!=="off"?(c.prPos||"front"):"none";
   const front=`<section class="pg">${pos==="bg"?`<div class="wm"><img src="${c.portrait}" alt=""></div>`:""}
     <div class="hd"><div class="brand"><h1>חרבות וכשפים</h1>${prRibbon("דף הדמות")}${pos==="front"?`<div class="por1"><img src="${c.portrait}" alt=""></div>`:""}</div>
       <div class="flds">${field("שם השחקן",c.player)}${field("שם הדמות",c.name)}${field("סוג הדמות",P?cname(c):"",1.4)}${field("תואר",title)}
@@ -2963,7 +2986,7 @@ function sheetPrintHTML(c){
     <div class="pr-foot">${esc(c.name||"")} · הודפס מאפליקציית החבורה · לפי דף הדמות בחוברת לשחקן המתחיל (ש 69–70)</div></section>`;
   const back=`<section class="pg back">
     <div class="hd"><div class="flds" style="padding-top:0">${field("שם השחקן",c.player)}${field("שם הדמות",c.name)}</div></div>
-    ${pos==="front"||pos==="bg"?"":`<div class="por">${c.portrait?`<img src="${c.portrait}" alt="">`:`<div class="ph">איור הדמות</div>`}</div>`}
+    ${pos==="front"||pos==="bg"?"":`<div class="por">${pos==="back"?`<img src="${c.portrait}" alt="">`:`<div class="ph">איור הדמות</div>`}</div>`}
     ${prRibbon("רקע")}${c.bg?`<p class="sm" style="white-space:pre-wrap">${esc(c.bg)}</p><div class="fill" style="flex:${pos==="front"||pos==="bg"?1.4:.6}"></div>`:(pos==="front"||pos==="bg"?'<div class="fill" style="flex:1.4"></div>':lines(7))}
     <p class="sm"><b>שפות:</b> ${(langMigrate(c),esc(langAll(c).join(", ")))}</p>
     <div class="gear-more" hidden>${prRibbon("ציוד נוסף (המשך מעמוד 1)")}<ul class="ls gear two"></ul></div>
@@ -2973,11 +2996,33 @@ function sheetPrintHTML(c){
 }
 /* print dialog */
 function prOpen(){
+  const c=cur(), pos=c.prPos||"front";
+  $("prBody").innerHTML=c.portrait?`<div class="pr-row"><div class="pr-por"><img src="${c.portrait}" alt="איור הדמות"></div>
+    <div class="pr-acts"><p class="small">האיור מודפס בשחור־לבן. איפה להדפיס אותו:</p>
+      <div class="pr-pos" role="radiogroup" aria-label="מיקום האיור">${[["front","בעמוד הראשון, ליד הכותרת"],["bg","ברקע העמוד הראשון, שקוף"],["back","בעמוד השני, גדול"],["off","בלי איור"]].map(([v,t])=>`<label><input type="radio" name="prPos" value="${v}" ${pos===v?"checked":""}> ${t}</label>`).join("")}</div></div></div>`
+    :`<p class="small">לדמות אין איור. אפשר להוסיף איור בדף הדמות, בלחיצה על המסגרת שליד השם. בלי איור, בעמוד השני נשאר מקום ריק לציור.</p>`;
+  $("prScrim").hidden=false; $("prDl").focus();
+  document.querySelectorAll('input[name=prPos]').forEach(r=>r.onchange=()=>{ c.prPos=r.value; schedule(); });   /* a print preference, so it is allowed during an adventure too */
+}
+/* the portrait: shown on the character sheet, uploaded or made with Flux; a new one replaces the old only after a warning */
+const POR_SIL='<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="22" r="11" fill="currentColor"/><path d="M10 60c0-13 10-22 22-22s22 9 22 22z" fill="currentColor"/></svg>';
+function shPorPaint(){
+  const c=cur(), box=$("shPor"); if(!box) return; const P=PROG[c.cls];
+  box.innerHTML=c.portrait?`<button class="fr" type="button" id="porZoom" data-ro-ok aria-label="הגדלת האיור"><img src="${c.portrait}" alt="איור של ${esc(c.name||"הדמות")}"></button>
+      ${P?`<span class="rb">${esc(cname(c))}</span>`:""}<button class="ed" type="button" id="porEdit" title="החלפת האיור" aria-label="החלפת האיור">✎</button>`
+    :`<button class="empty" type="button" id="porEdit">${POR_SIL}<span>הוספת איור</span></button>`;
+  $("porEdit").onclick=porOpen; if($("porZoom")) $("porZoom").onclick=porZoom;
+}
+function porZoom(){ const c=cur(); if(!c.portrait) return; $("porViewImg").src=c.portrait; $("porView").hidden=false; }
+function porZoomClose(){ $("porView").hidden=true; const z=$("porZoom"); if(z) z.focus(); }
+$("porView").onclick=porZoomClose;
+function porSet(c,img){ c.portrait=img; c.porV=Date.now().toString(36); schedule(); shPorPaint(); toast("האיור נשמר עם הדמות"); }
+const porReplace=(c,go)=>c.portrait?ask("להחליף את האיור?",`האיור הנוכחי של ${c.name||"הדמות"} יימחק, והאיור החדש יבוא במקומו.`,"החלפה",go):go();
+function porOpen(){
   const c=cur(), FZ=frozen();
-  $("prBody").innerHTML=`<div class="pr-row"><div class="pr-por">${c.portrait?`<img src="${c.portrait}" alt="איור הדמות">`:'<span class="muted small">אין איור</span>'}</div>
-    <div class="pr-acts"><p class="small">איור שחור־לבן של הדמות. איפה להדפיס אותו:</p>
-      <div class="pr-pos" role="radiogroup" aria-label="מיקום האיור">${[["front","בעמוד הראשון"],["bg","ברקע העמוד הראשון, שקוף"],["back","בעמוד השני, גדול"]].map(([v,t])=>`<label><input type="radio" name="prPos" value="${v}" ${(c.prPos||"front")===v?"checked":""} ${c.portrait?"":"disabled"}> ${t}</label>`).join("")}</div>
-      <button class="btn small" id="prUp" ${FZ?"disabled":""}>${c.portrait?"החלפת האיור":"העלאת איור"}</button>
+  $("porBody").innerHTML=`<div class="pr-row"><div class="pr-por">${c.portrait?`<img src="${c.portrait}" alt="האיור הנוכחי">`:'<span class="muted small">אין איור</span>'}</div>
+    <div class="pr-acts"><p class="small">${c.portrait?"איור חדש, שמעלים או שיוצרים, יחליף את הנוכחי. לפני ההחלפה תופיע שאלה.":"מעלים תמונה מהמכשיר, או יוצרים איור מפרטי הדמות."}</p>
+      <button class="btn small" id="prUp" ${FZ?"disabled":""}>העלאת תמונה</button>
       ${c.portrait?`<button class="btn small del" id="prRm" ${FZ?"disabled":""}>הסרת האיור</button>`:""}
       <input type="file" id="prFile" accept="image/*" hidden></div></div>
     <div class="pr-ai"><b class="small">איור אוטומטי</b>
@@ -2985,17 +3030,18 @@ function prOpen(){
       <textarea id="prPrompt" rows="5">${esc(portraitPrompt(c))}</textarea>
       <div class="pr-ai-acts"><button class="btn small primary" id="prGen" ${FZ?"disabled":""}>✨ יצירת איור ב־Hugging Face</button><button class="btn small" id="prCopy">העתקת ההנחיה (ל־Gemini)</button></div>
       <p class="small" id="prGenMsg" role="status"></p>
-      <div class="pr-new" id="prNew" hidden><img id="prNewImg" alt="איור שנוצר"><div class="pr-acts"><button class="btn small primary" id="prUse">שימוש באיור הזה</button><button class="btn small" id="prAgain">ניסיון נוסף</button></div></div></div>`;
-  $("prScrim").hidden=false; $("prDl").focus();
-  $("prUp")&&($("prUp").onclick=()=>{$("prFile").value="";$("prFile").click();});
-  $("prFile").onchange=async()=>{const f=$("prFile").files[0]; if(!f) return; try{ c.portrait=await shrinkPortrait(f); c.porV=Date.now().toString(36); schedule(); toast("האיור נשמר עם הדמות"); prOpen(); }catch(e){ toast("לא הצלחתי לקרוא את התמונה"); } };
-  $("prRm")&&($("prRm").onclick=()=>{ delete c.portrait; delete c.porV; schedule(); prOpen(); });
-  document.querySelectorAll('input[name=prPos]').forEach(r=>r.onchange=()=>{ c.prPos=r.value; schedule(); });   /* a print preference, so it is allowed during an adventure too */
+      <div class="pr-new" id="prNew" hidden><img id="prNewImg" alt="איור שנוצר"><div class="pr-acts"><button class="btn small primary" id="prUse">${c.portrait?"החלפה באיור הזה":"שימוש באיור הזה"}</button><button class="btn small" id="prAgain">ניסיון נוסף</button></div></div></div>`;
+  $("porScrim").hidden=false; $("porClose").focus();
+  $("prUp").onclick=()=>porReplace(c,()=>{ $("prFile").value=""; $("prFile").click(); });
+  $("prFile").onchange=async()=>{const f=$("prFile").files[0]; if(!f) return; try{ porSet(c,await shrinkPortrait(f)); porOpen(); }catch(e){ toast("לא הצלחתי לקרוא את התמונה"); } };
+  $("prRm")&&($("prRm").onclick=()=>ask("להסיר את האיור?",`האיור של ${c.name||"הדמות"} יימחק.`,"הסרה",()=>{ delete c.portrait; delete c.porV; schedule(); shPorPaint(); porOpen(); }));
   $("prGen").onclick=()=>prGen(c); $("prAgain").onclick=()=>prGen(c);
-  $("prUse").onclick=()=>{ if(!PR_NEW) return; c.portrait=PR_NEW; c.porV=Date.now().toString(36); PR_NEW=null; schedule(); toast("האיור נשמר עם הדמות"); prOpen(); };
+  $("prUse").onclick=()=>{ if(!PR_NEW) return; const img=PR_NEW; porReplace(c,()=>{ PR_NEW=null; porSet(c,img); porOpen(); }); };
   $("prCopy").onclick=async()=>{const t=$("prPrompt").value; try{ await navigator.clipboard.writeText(t); toast("ההנחיה הועתקה"); }catch(e){ $("prPrompt").focus(); $("prPrompt").select(); toast("סמנו והעתיקו ידנית"); } };
 }
-function prClose(){ $("prScrim").hidden=true; PR_NEW=null; }
+function porClose(){ $("porScrim").hidden=true; PR_NEW=null; const b=$("porEdit"); if(b) b.focus(); }
+$("porClose").onclick=porClose;
+function prClose(){ $("prScrim").hidden=true; }
 /* portrait from Flux 1 Schnell on Hugging Face, with the token saved on this device */
 let PR_NEW=null, PR_BUSY=false;
 async function prGen(c){
@@ -3377,7 +3423,7 @@ function sheetFill(){
   setVal("shPlayer",c.player); setVal("shAge",c.age); $("shSex").value=c.sex||"";
   const bg=G(c,"בוגר","בוגרת"); $("shAge").placeholder=c.cls==="elf"?bg+" בגיל 100":["halfling","bard"].includes(c.cls)?bg+" בגיל 30":c.cls==="dwarf"?bg+" בגיל 50":"";
   $("shAge").title=c.cls==="elf"?"אלף נחשב בוגר בגיל 100 (ש 37)":["halfling","bard"].includes(c.cls)?"בן מחצית נחשב בוגר בגיל 30 (ש 38)":c.cls==="dwarf"?"גמד נחשב בוגר בגיל 50 (ש 39)":"";
-  sheetDerived();
+  sheetDerived(); shPorPaint();
 }
 function sheetDerived(){
   const c=cur(), P=PROG[c.cls], C=CLASSES[c.cls], m=mods(c), L=lvlOf(c), t=invTotals(c);
@@ -4794,7 +4840,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keydown",e=>{
   if(e.key!=="Escape"||e.defaultPrevented||e.isComposing) return;
   const open=id=>{ const x=$(id); return !!(x&&!x.hidden); };
-  const stops=[["scrim",()=>closeDlg()],["lvScrim",()=>closeLevelUp()],["prScrim",()=>prClose()],["rollScrim",()=>rollClose()],["genScrim",()=>genClose()],["modeScrim",()=>modeClose()],
+  const stops=[["scrim",()=>closeDlg()],["lvScrim",()=>closeLevelUp()],["porView",()=>porZoomClose()],["porScrim",()=>porClose()],["prScrim",()=>prClose()],["rollScrim",()=>rollClose()],["genScrim",()=>genClose()],["modeScrim",()=>modeClose()],
     ["bkEd",()=>{ if(ED&&ED.edit){ ask("לצאת בלי לשמור?","השינויים שלא נשמרו בטופס יאבדו.","יציאה",()=>{ if(ED.mode==="run") edClose(); else { ED.edit=false; edRender(); } }); } else edClose(); }],
     ["relPanel",()=>{ $("relPanel").hidden=true; $("verBtn").focus(); }],
     ["backupPanel",()=>{ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); $("backupBtn").focus(); }]];
