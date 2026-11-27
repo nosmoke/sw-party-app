@@ -59,7 +59,7 @@ header.top{padding-block:14px 10px;display:flex;flex-wrap:wrap;gap:8px 20px;alig
 .brand{background:color-mix(in srgb,var(--bg) 78%,transparent);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);border-radius:8px;padding:4px 10px}
 .brand h1{font-size:1.5rem;line-height:1.1}
 .brand p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
-.chartabs{flex:1 1 320px;min-width:0;display:flex;gap:6px;overflow-x:auto;padding-block:4px;scrollbar-width:thin}
+.chartabs{flex:1 1 220px;min-width:0;display:flex;gap:6px;overflow-x:auto;padding-block:4px;scrollbar-width:thin}
 .ctab{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 12px;min-width:7.5em;max-width:13em;text-align:start}
 .ctab b{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ctab small{color:var(--muted);font-size:.78rem;white-space:nowrap}
@@ -235,7 +235,7 @@ body.ext .not-ext{display:none}
 .gm-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:6px 0}
 .gm-code{font:600 1.05rem/1.2 ui-monospace,Menlo,Consolas,monospace;direction:ltr;unicode-bidi:isolate;letter-spacing:.06em}
 .gm-row input[type=text],.gm-row input[type=password]{font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit}
-#gmCodeIn{direction:ltr;width:13ch;letter-spacing:.08em}
+#gmCodeIn{direction:ltr;width:15ch;letter-spacing:.06em;font-family:ui-monospace,Menlo,Consolas,monospace;text-align:center}
 .gm-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
 .gm-list li{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
 .gm-list li.on{border-color:var(--accent)}
@@ -622,6 +622,8 @@ body.ext .not-ext{display:none}
 @media (max-width:560px){.sheet{grid-template-columns:minmax(0,1fr)}.saves{grid-template-columns:repeat(2,minmax(0,1fr))}.gg{grid-template-columns:minmax(0,1fr)}}
 /* compact top */
 #collapseBtn{flex:0 0 auto}
+header.top .tools{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-inline-start:auto}
+header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height:1}
 .minibar{display:none;gap:6px 22px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:10px}
 .app.compact header.top,.app.compact .charpanel,.app.compact .status{display:none}
 .app.compact .minibar{display:flex}
@@ -695,10 +697,12 @@ body.ext .not-ext{display:none}
       <nav class="views" aria-label="מסכים"><a href="#sheet" data-v="sheet">דף הדמות</a><a href="#shop" data-v="shop">חנות הציוד</a><a href="#map" data-v="map">מפת מבוך</a><a href="#book" data-v="book" class="dm-only">ספר ההרפתקה</a><a href="#adv" data-v="adv">מעקב הרפתקה</a></nav>
     </div>
     <div class="chartabs" id="charTabs" role="tablist" aria-label="דמויות"></div>
+    <div class="tools">
     <button class="btn small mode" id="modeBtn" aria-haspopup="dialog"></button>
-    <button class="btn small" id="themeBtn" title="מראה: אוטומטי לפי המכשיר, בהיר או כהה"></button>
-    <button class="btn small" id="backupBtn" aria-expanded="false" aria-controls="backupPanel">⚙ הגדרות</button>
-    <button class="btn small" id="collapseBtn" title="להשאיר רק שורת סיכום קטנה">מזעור ▴</button>
+    <button class="btn small ico" id="themeBtn" title="מראה: אוטומטי לפי המכשיר, בהיר או כהה"></button>
+    <button class="btn small ico" id="backupBtn" aria-expanded="false" aria-controls="backupPanel" title="הגדרות" aria-label="הגדרות">⚙</button>
+    <button class="btn small ico" id="collapseBtn" title="מזעור: להשאיר רק שורת סיכום קטנה" aria-label="מזעור">▴</button>
+    </div>
   </header>
 
   <section class="backup" id="backupPanel" hidden aria-label="הגדרות">
@@ -713,6 +717,7 @@ body.ext .not-ext{display:none}
         <button class="btn small" id="bkLoad">שחזור מקובץ</button>
         <button class="btn small" id="bkCopy">העתקה כטקסט</button>
         <button class="btn small" id="bkPaste">שחזור מטקסט</button>
+        <button class="btn small not-ext" id="bkReset">איפוס הכול</button>
         <input type="file" id="bkFile" accept=".json,application/json,text/plain" hidden>
       </div>
     </div>
@@ -1488,9 +1493,17 @@ function gmLeave(){
   ask("להתנתק מהמשחק?","המכשיר יחזור לחבורה ששמורה בו עצמו. המשחק עצמו לא נמחק, ואפשר לחזור אליו עם אותו קוד.","התנתקות",async()=>{ await switchGame(null); toast("התנתקת מהמשחק"); });
 }
 function gmReset(){
-  if(MODE!=="dm"||!GAME) return;
+  if(MODE!=="dm") return;
+  if(!GAME) return resetAll();
   ask("לאפס את המשחק?",`כל הנתונים של המשחק ${GMETA&&GMETA.name?"\""+GMETA.name+"\" ":""}יימחקו לכל המחוברים: הדמויות, האיורים, מעקב ההרפתקה, ספר ההרפתקה וסיסמת המנחה (תחזור ל־${PW_DEFAULT}). הקוד נשאר אותו קוד. כדאי לשמור גיבוי לפני כן.`,"איפוס המשחק",()=>{
     state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); toast("המשחק אופס. סיסמת המנחה חזרה ל־"+PW_DEFAULT);
+  });
+}
+/* reset everything outside a hosted game: this device's party, or (inside Claude) the account's party */
+function resetAll(){
+  if(MODE!=="dm") return;
+  ask("לאפס את כל הנתונים?",`כל ${state.chars.length} הדמויות (${state.chars.map(c=>c.name).join(", ")}), האיורים, מעקב ההרפתקה, ספר ההרפתקה וסיסמת המנחה (תחזור ל־${PW_DEFAULT}) יימחקו ${EXT?"מהמכשיר הזה":"מהחשבון ומכל המכשירים שלו"}. כדאי לשמור גיבוי לפני כן.`,"איפוס הכול",()=>{
+    state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); bkSummary(); toast("הכול אופס. סיסמת המנחה חזרה ל־"+PW_DEFAULT);
   });
 }
 async function gmCreate(){
@@ -1540,8 +1553,9 @@ function renderGame(){
     if(dm) h+=`<div class="gm-row"><button class="btn small" id="gmResetBtn">איפוס המשחק</button><span class="muted small">מוחק את כל נתוני המשחק לכל המחוברים</span></div>`;
   } else {
     h+=`<p class="small">המכשיר לא מחובר למשחק, והחבורה נשמרת רק בו. כדי להצטרף, הכניסו את הקוד שקיבלתם מהמנחה:</p>`;
+    if(dm) h+=`<div class="gm-row"><button class="btn small" id="gmResetBtn">איפוס החבורה במכשיר</button><span class="muted small">מוחק את כל הנתונים ששמורים במכשיר הזה</span></div>`;
   }
-  h+=`<div class="gm-row"><label for="gmCodeIn">${GAME?"מעבר למשחק אחר":"קוד משחק"}</label><input type="text" id="gmCodeIn" inputmode="numeric" maxlength="11" placeholder="10 ספרות" autocomplete="off">
+  h+=`<div class="gm-row"><label for="gmCodeIn">${GAME?"מעבר למשחק אחר":"קוד משחק"}</label><input type="text" id="gmCodeIn" inputmode="numeric" maxlength="11" placeholder="12345-67890" autocomplete="off" aria-describedby="gmErr">
     <button class="btn small ${GAME?"":"primary"}" id="gmJoinBtn" ${GBUSY||!online?"disabled":""}>התחברות</button></div><p class="small" id="gmErr" role="alert" style="color:var(--bad,#b00)"></p>`;
   if(dm){
     h+=`<div class="gm-dm"><h3>ניהול משחקים</h3>`;
@@ -1568,7 +1582,8 @@ function renderGame(){
   const on=(id,f)=>{ const e=$(id); if(e) e.onclick=f; };
   on("gmCopy",async()=>{ try{ await navigator.clipboard.writeText(GAME); toast("הקוד הועתק"); }catch(e){ toast("הקוד: "+isoCode(GAME)); } });
   on("gmLeaveBtn",gmLeave); on("gmResetBtn",gmReset); on("gmJoinBtn",()=>gmJoin($("gmCodeIn").value));
-  const ci=$("gmCodeIn"); if(ci) ci.onkeydown=e=>{ if(e.key==="Enter") gmJoin(ci.value); };
+  const ci=$("gmCodeIn"); if(ci){ ci.onkeydown=e=>{ if(e.key==="Enter") gmJoin(ci.value); };
+    ci.oninput=()=>{ const d=ci.value.replace(/\D/g,"").slice(0,10); const v=d.length>5?d.slice(0,5)+"-"+d.slice(5):d; if(v!==ci.value){ ci.value=v; ci.setSelectionRange(v.length,v.length); } }; }
   on("gmGoogle",async()=>{ try{ await EXT.signInGoogle(); }catch(e){ const er=$("gmErr"); if(er) er.textContent="הכניסה עם Google לא הושלמה"; } });
   on("gmSignOut",async()=>{ try{ await EXT.signOutGoogle(); }catch(e){} GLIST=null; renderGame(); });
   on("gmCreateBtn",gmCreate); on("gmRefresh",gmLoadList);
@@ -2797,6 +2812,7 @@ $("bkLoad").onclick=()=>{$("bkFile").value="";$("bkFile").click();};
 $("bkFile").onchange=()=>{const f=$("bkFile").files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>restoreFrom(String(rd.result));rd.onerror=()=>toast("לא הצלחתי לקרוא את הקובץ");rd.readAsText(f);};
 $("bkCopy").onclick=async()=>{const t=backupJSON();try{await navigator.clipboard.writeText(t);toast("טקסט הגיבוי הועתק");}catch(e){$("bkPasteBox").hidden=false;$("bkText").value=t;$("bkText").focus();$("bkText").select();toast("סמנו והעתיקו מהתיבה");}};
 $("lockBtn").onclick=toggleLock; $("shLockBtn").onclick=toggleLock;
+$("bkReset").onclick=resetAll;
 $("bkClose").onclick=()=>{$("backupPanel").hidden=true;$("backupBtn").setAttribute("aria-expanded","false");};
 $("bkPaste").onclick=()=>{$("bkPasteBox").hidden=false;$("bkText").value="";$("bkText").focus();};
 $("bkPasteGo").onclick=()=>restoreFrom($("bkText").value);
@@ -3860,7 +3876,7 @@ function questInit(){
 const THEMES=[["auto","◐ אוטומטי"],["light","☀ בהיר"],["dark","☾ כהה"]];
 function getTheme(){try{const t=localStorage.getItem("sw-theme");return THEMES.some(x=>x[0]===t)?t:"auto";}catch(e){return "auto";}}
 function applyTheme(t){const r=document.documentElement; if(t==="auto") delete r.dataset.theme; else r.dataset.theme=t;
-  const b=$("themeBtn"); if(b){b.textContent="מראה: "+THEMES.find(x=>x[0]===t)[1];}}
+  const b=$("themeBtn"); if(b){const n=THEMES.find(x=>x[0]===t)[1]; b.textContent=n.split(" ")[0]; b.title="מראה: "+n.split(" ").slice(1).join(" ")+" (לחיצה מחליפה)"; b.setAttribute("aria-label",b.title);}}
 applyTheme(getTheme());
 $("themeBtn").onclick=()=>{const i=THEMES.findIndex(x=>x[0]===getTheme()), t=THEMES[(i+1)%THEMES.length][0];
   try{localStorage.setItem("sw-theme",t);}catch(e){} applyTheme(t); toast(t==="auto"?"המראה לפי הגדרות המכשיר":t==="light"?"מראה בהיר":"מראה כהה");};
