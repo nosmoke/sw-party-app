@@ -641,6 +641,12 @@ body.ext .not-ext{display:none}
 .gg{display:grid;grid-template-columns:8em minmax(0,1fr);gap:8px;font-size:.88rem;padding:4px 0;border-bottom:1px dashed var(--line)}
 .gm{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
 #shLangs,#shNotes,#shBg{width:100%}
+.lg-list{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.lg-list label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.9rem;cursor:pointer;background:var(--surface)}
+.lg-list label.fix{background:var(--sunk);cursor:default}.lg-list label.on{border-color:var(--accent)}
+.lg-list label.off{opacity:.5;cursor:not-allowed}
+.lg-free{display:block;font-size:.85rem;margin-bottom:3px}
+.lg-over{color:var(--bad,#b00)}
 .muted{color:var(--muted)} .small{font-size:.8rem;margin:6px 0 0} .dn{color:var(--bad)}
 @media (max-width:860px){.abil{grid-template-columns:repeat(3,minmax(0,1fr))}.cgrid{grid-template-columns:repeat(2,minmax(0,1fr))}#shHPbox{grid-column:1/-1}.sh-name{font-size:1.4rem}}
 .hp{flex-wrap:wrap;align-items:flex-end}.hp input{min-width:0}
@@ -934,7 +940,8 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
         <div id="bookPick" hidden></div></section>
       <section class="sbox" id="shTurnBox"><h3 id="shTurnTitle">גירוש אל־מתים <small>ש 26</small></h3><div id="shTurn"></div></section>
       <section class="sbox sh-wide"><h3>ציוד וכסף <small>מהחנות</small></h3><div id="shGear"></div></section>
-      <section class="sbox"><h3>שפות <small>ש 21</small></h3><div id="shLangInfo"></div><input type="text" id="shLangs" placeholder="השפות שנבחרו" aria-label="שפות שנבחרו"></section>
+      <section class="sbox"><h3>שפות <small>ש 21</small></h3><div id="shLangInfo"></div><div class="lg-list" id="shLangList"></div>
+        <label class="lg-free" for="shLangs">שפות נוספות לפי המערכה <span class="muted small">(טקסט חופשי, מפרידים בפסיק)</span></label><input type="text" id="shLangs" placeholder="למשל: שפת הים, קובולדית" aria-label="שפות נוספות לפי המערכה"></section>
       <section class="sbox"><h3>רקע</h3><textarea id="shBg" rows="5" placeholder="מאיפה הדמות באה, משפחה, מה מניע אותה, אופי, מראה…" aria-label="רקע"></textarea></section>
       <section class="sbox"><h3>הערות</h3><textarea id="shNotes" rows="5" placeholder="סגנונות לחימה וטכניקות שנבחרו, לחשים בספר…" aria-label="הערות"></textarea></section>
     </div>
@@ -1344,7 +1351,7 @@ function speed(wtKg,carry){
 
 /* ---------- state ---------- */
 const uid=()=>Math.random().toString(36).slice(2,10);
-const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",notes:"",bg:"",player:"",age:"",sex:"",locked:false};
+const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",langSel:[],notes:"",bg:"",player:"",age:"",sex:"",locked:false};
 function newChar(name){return Object.assign({id:uid(),name:name||"דמות חדשה",cls:"",money:100,str:10,limit:null,cart:[],inv:[],spent:0,gain:0},SHEET_DEF,{book:[]});}
 let state={current:null,chars:[]};
 let saveTimer=null, store=null, dirty=false, writing=false, lastSaved=null, unsub=null, dbRef=null, uidRef=null;
@@ -2353,7 +2360,7 @@ function sheetPrintHTML(c){
     <div class="hd"><div class="flds" style="padding-top:0">${field("שם השחקן",c.player)}${field("שם הדמות",c.name)}</div></div>
     ${pos==="front"||pos==="bg"?"":`<div class="por">${c.portrait?`<img src="${c.portrait}" alt="">`:`<div class="ph">איור הדמות</div>`}</div>`}
     ${prRibbon("רקע")}${c.bg?`<p class="sm" style="white-space:pre-wrap">${esc(c.bg)}</p><div class="fill" style="flex:${pos==="front"||pos==="bg"?1.4:.6}"></div>`:(pos==="front"||pos==="bg"?'<div class="fill" style="flex:1.4"></div>':lines(7))}
-    ${c.langs?`<p class="sm"><b>שפות:</b> ${esc(c.langs)}</p>`:""}
+    <p class="sm"><b>שפות:</b> ${(langMigrate(c),esc(langAll(c).join(", ")))}</p>
     ${prRibbon("הערות")}${c.notes?`<p class="sm" style="white-space:pre-wrap">${esc(c.notes)}</p>`:""}<div class="fill" style="margin-bottom:5mm"></div>
     <div class="foot">${esc(c.name||"")} · עמוד 2</div></section>`;
   return {css,body:`<div class="prs">${front}${back}</div>`};
@@ -2464,7 +2471,7 @@ $("prScrim").addEventListener("click",e=>{ if(e.target===$("prScrim")) prClose()
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("prScrim").hidden) prClose(); });
 
 /* ---------- character lock: freezes the essentials (identity, class, level, abilities, max HP, spellbook) ---------- */
-const LOCK_SEL="#charName,#charClass,#startMoney,#rollMoney,#str,#limitOverride,#delChar,#shName,#shPlayer,#shClass,#shLevel,#shAlign,#shSex,#shAge,#shHPmax,#hpRoll,#shLangs,#bookPickBtn,[id^='ab-'],#shBook [data-rm],#bookPick [data-add]";
+const LOCK_SEL="#charName,#charClass,#startMoney,#rollMoney,#str,#limitOverride,#delChar,#shName,#shPlayer,#shClass,#shLevel,#shAlign,#shSex,#shAge,#shHPmax,#hpRoll,#shLangs,#rollBtn,[data-lang],#bookPickBtn,[id^='ab-'],#shBook [data-rm],#bookPick [data-add]";
 function applyLock(){
   const FZ=frozen(), L=!!cur().locked||FZ;
   const app0=document.querySelector(".app"); app0.classList.toggle("frozen",FZ); app0.classList.toggle("player",MODE==="player"); app0.classList.toggle("dm",MODE==="dm");
@@ -2702,6 +2709,7 @@ function sheetInit(){
   $("hpMinus").onclick=()=>{const c=cur();c.hp=(c.hp??c.hpMax??0)-1;schedule();sheetFill();};
   $("hpPlus").onclick=()=>{const c=cur();c.hp=(c.hp??c.hpMax??0)+1;if(clampHP(c))toast("הדמות כבר במלוא נקודות הפגיעה");schedule();sheetFill();};
   $("shLangs").addEventListener("input",e=>{cur().langs=e.target.value;schedule();});
+  $("shLangs").addEventListener("change",()=>sheetDerived());
   $("bookPickBtn").onclick=()=>{pickerOpen=!pickerOpen;renderBook();};
   $("shPlayer").addEventListener("input",e=>{cur().player=e.target.value;schedule();});
   $("shAge").addEventListener("input",e=>{cur().age=e.target.value;schedule();});
@@ -2730,7 +2738,7 @@ function sheetFill(){
   setVal("shXP",c.xp||0); $("shAlign").value=c.align||"";
   for(const [k] of ABIL) setVal("ab-"+k,clampA(c[k]));
   { const n=$("shRollNote"); if(n) n.textContent=rollNote(c); }
-  clampHP(c); setVal("shHP",c.hp); setVal("shHPmax",c.hpMax); $("shHP").max=c.hpMax??""; setVal("shLangs",c.langs); setVal("shNotes",c.notes); setVal("shBg",c.bg);
+  clampHP(c); setVal("shHP",c.hp); setVal("shHPmax",c.hpMax); $("shHP").max=c.hpMax??""; langMigrate(c); setVal("shLangs",c.langs); setVal("shNotes",c.notes); setVal("shBg",c.bg);
   setVal("shPlayer",c.player); setVal("shAge",c.age); $("shSex").value=c.sex||"";
   const bg=G(c,"בוגר","בוגרת"); $("shAge").placeholder=c.cls==="elf"?bg+" בגיל 100":["halfling","bard"].includes(c.cls)?bg+" בגיל 30":c.cls==="dwarf"?bg+" בגיל 50":"";
   $("shAge").title=c.cls==="elf"?"אלף נחשב בוגר בגיל 100 (ש 37)":["halfling","bard"].includes(c.cls)?"בן מחצית נחשב בוגר בגיל 30 (ש 38)":c.cls==="dwarf"?"גמד נחשב בוגר בגיל 50 (ש 39)":"";
@@ -2861,12 +2869,46 @@ function sheetDerived(){
   $("shGear").innerHTML=(GR.length?GR.map(([h,a])=>`<div class="gg"><b>${h}</b><span>${a.join(" · ")}</span></div>`).join(""):'<p class="muted">אין חפצים ברשות הדמות. קונים בחנות ולוחצים "רכישת הסל".</p>')+
     `<div class="gm"><span>כסף: <b class="num">${coins(left)}</b></span><a href="#shop" class="btn small">לחנות</a></div>`;
   /* languages */
-  const racial=c.cls==="elf"?["אלפית"]:c.cls==="dwarf"?["גמדית"]:c.cls==="druid"?["שפת הדרואידים"]:[];
+  const racial=langFixed(c).slice(1);
   $("mbHPV").innerHTML=hpMax?`<b class="ltr ${hp<=Math.ceil(hpMax/3)?"dn":""}">${hp}</b> מתוך ${hpMax}`:"—";
   $("mbACV").innerHTML=`<b>${ac}</b>`;
   if(P) $("mbClass").textContent=`${cname(c)} · דרגה ${L}`;
   renderBook();
-  $("shLangInfo").innerHTML=`<p>השפה המדוברת${racial.length?", "+racial.join(", "):""}${m.langs?` ועוד <b>${m.langs}</b> לבחירה`:""}.</p><p class="muted small">לבחירה: גמדית, אלפית, דרקונית, ענקית, גובלינית ועוד לפי המערכה.</p>`;
+  renderLangs(c,m.langs);
+}
+/* languages (ש 21): the common tongue and the race's language are given; INT sets how many more are chosen.
+   Elves speak Elvish (ש 37), dwarves Dwarvish (ש 39–40), half-elves mostly speak Elvish too (מת' 52), druids their secret tongue (מת' 30). */
+const LANGS=["גמדית","אלפית","דרקונית","ענקית","גובלינית"];
+const LANG_NOTE={"ענקית":"גם עוגים","גובלינית":"גם אורקים"};
+function langFixed(c){
+  const r=["השפה המדוברת"];
+  if(["elf","runesmith","pathf"].includes(c.cls)) r.push("אלפית");
+  if(["dwarf","stonew"].includes(c.cls)) r.push("גמדית");
+  if(c.cls==="druid") r.push("שפת הדרואידים");
+  return r;
+}
+const langFree=c=>String(c.langs||"").split(/[,،;\n]+/).map(x=>x.trim()).filter(Boolean);
+const LGM=new WeakSet();
+function langMigrate(c){   /* older sheets kept the chosen languages as free text */
+  if(LGM.has(c)) return; LGM.add(c); if(!Array.isArray(c.langSel)) c.langSel=[];
+  const fixed=langFixed(c), keep=[];
+  for(const x of langFree(c)){ const n=x.replace(/^השפה\s*/,"").replace(/^שפה\s*/,"");
+    if(LANGS.includes(x)){ if(!fixed.includes(x)&&!c.langSel.includes(x)) c.langSel.push(x); }
+    else if(/^(השפה )?המדוברת$|^מדוברת$/.test(x)||fixed.includes(x)) {}
+    else keep.push(x); }
+  c.langs=keep.join(", ");
+}
+function langAll(c){ const f=langFixed(c); return [...f,...(c.langSel||[]).filter(x=>!f.includes(x)),...langFree(c)]; }
+function renderLangs(c,allowed){
+  langMigrate(c);
+  const fixed=langFixed(c), sel=(c.langSel||[]).filter(x=>!fixed.includes(x)), used=sel.length+langFree(c).length, full=used>=allowed;
+  const locked=!!c.locked||frozen();
+  $("shLangInfo").innerHTML=`<p>${allowed?`אפשר לבחור עוד <b>${allowed}</b> ${allowed===1?"שפה":"שפות"} לפי התבונה. נבחרו <b class="${used>allowed?"lg-over":""}">${used}</b>.`:"התבונה לא מאפשרת שפות נוספות."}${used>allowed?` <span class="lg-over">יותר מהמותר${allowed?"":" (התבונה ירדה?)"}.</span>`:""}</p>`;
+  $("shLangList").innerHTML=fixed.map(x=>`<label class="fix" title="שפה שהדמות דוברת מעצם הגזע או סוג הדמות"><input type="checkbox" checked disabled> ${esc(x)}</label>`).join("")+
+    LANGS.filter(x=>!fixed.includes(x)).map(x=>{ const on=sel.includes(x), off=!on&&full;
+      return `<label class="${on?"on":""} ${off?"off":""}"><input type="checkbox" data-lang="${esc(x)}" ${on?"checked":""} ${off||locked?"disabled":""}> ${esc(x)}${LANG_NOTE[x]?` <small class="muted">(${LANG_NOTE[x]})</small>`:""}</label>`; }).join("");
+  $("shLangList").querySelectorAll("[data-lang]").forEach(e=>e.onchange=()=>{ const cc=cur(); const L2=new Set((cc.langSel||[]).filter(x=>!langFixed(cc).includes(x)));
+    if(e.checked) L2.add(e.dataset.lang); else L2.delete(e.dataset.lang); cc.langSel=[...L2]; schedule(); sheetDerived(); });
 }
 function renderSheet(){ if(!$("sheetPane").hidden) sheetFill(); }
 function applyView(){
