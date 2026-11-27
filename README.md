@@ -11,7 +11,7 @@
 | סקריפט הבנייה | `tools/build.sh` |
 | חיבור ל־Firebase (לגרסה החיצונית) | `tools/ext-head.html`, `ext.js`, `config.js` |
 | חוקי האבטחה של Firestore | `firestore.rules` (מדביקים ב־Firebase ← Firestore ← Rules) |
-| קבצים שהאפליקציה טוענת | `adventures/`, `items/`, `spells/` ועוד |
+| קבצים שהאפליקציה טוענת | `items/`, `spells/` ועוד (ספרי ההרפתקה נמצאים בספרייה ב־Firebase, והמקורות במאגר הפרטי sw-party-books) |
 | האתר הבנוי | `index.html` (נבנה מ־`src/app.html`) |
 | תיוג גרסאות אוטומטי | `.github/workflows/tag-version.yml` |
 

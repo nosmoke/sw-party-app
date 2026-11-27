@@ -4548,7 +4548,7 @@ function roomSt(bid,rid){const s=qs(bid); if(!s.rooms[rid]) s.rooms[rid]={st:"",
 /* ---------- the adventure library (hosted version): books live in Firestore, books/{id}.
    The book document holds only what players may see (title, players' map); the book itself (books/{id}/dm/book) and the DM's pictures (dimg)
    open to the uploader, to the manager, and to every Google DM when the manager marks the book "for everyone". ---------- */
-const LIB_STATIC=true;   /* until the built-in books are uploaded: books not yet in the library still come from the site's files */
+const LIB_STATIC=false;   /* the site no longer carries book files: every book comes from the library */
 const LIB_ON=()=>!!(EXT&&dbRef);
 let LIB=null, LIB_ERR="", LIB_BUSY="";
 const IMG_CACHE={};
@@ -4805,6 +4805,7 @@ function renderQuest(){
   const root=$("questRoot"), q=qst(); renderMbAdv();
   if(!QINDEX&&!QERR){ root.innerHTML='<p class="muted">טוען את רשימת ההרפתקאות…</p>'; if(!QBUSY){QBUSY=true;qLoadIndex().then(()=>{QBUSY=false;renderQuest();});} return; }
   if(!QINDEX){ root.innerHTML=`<p class="dn">${esc(QERR)}</p>`; return; }
+  if(!QINDEX.length&&!q.active){ root.innerHTML=`<p class="muted">${!LIB_ON()?"ספרי ההרפתקה נמצאים בספרייה של האתר, ואין אליה חיבור כרגע. בדקו את האינטרנט ורעננו.":!gGoogle()?"ספרי ההרפתקה פתוחים למנחים שנכנסו עם Google. אפשר להיכנס בהגדרות, בלשונית \"חשבון מנחה\".":"אין עדיין הרפתקאות בספרייה. אפשר להעלות הרפתקה בהגדרות, בלשונית \"ספרייה\"."}</p>`; return; }
   if(q.active&&!QBOOKS[q.active]&&!QERR){ root.innerHTML=qTop(null)+'<p class="muted">טוען את ההרפתקה…</p>'; if(!QBUSY){QBUSY=true;qLoadBook(q.active).then(()=>{QBUSY=false;renderQuest();});} return; }
   const b=q.active?QBOOKS[q.active]:null;
   renderMbBook(b);
