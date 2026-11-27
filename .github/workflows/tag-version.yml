@@ -1,0 +1,37 @@
+# Creates the tag and release vX.Y whenever a commit pushed to main starts with "Version X.Y".
+# The release notes come from that version's entry in RELEASES inside index.html.
+name: Tag version
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+      - name: Tag commits that start with "Version"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -e
+          if git cat-file -e "$BEFORE" 2>/dev/null; then range="$BEFORE..HEAD"; else range="-1 HEAD"; fi
+          git log --format='%H %s' $range | while read -r sha subject; do
+            v=$(printf '%s' "$subject" | sed -nE 's/^Version ([0-9]+(\.[0-9]+)+).*/\1/p')
+            [ -z "$v" ] && continue
+            if gh release view "v$v" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/v$v" >/dev/null 2>&1; then
+              echo "v$v already exists"; continue
+            fi
+            notes=$(git show "$sha:index.html" | python3 -c '
+          import sys, re, json
+          v = sys.argv[1]
+          m = re.search(r"\[\"" + re.escape(v) + r"\",(\"(?:[^\"\\\\]|\\\\.)*\")\]", sys.stdin.read())
+          print(json.loads(m.group(1)) if m else "גרסה " + v)
+          ' "$v")
+            gh release create "v$v" --target "$sha" --title "$v" --notes "$notes"
+            echo "created v$v at $sha"
+          done
