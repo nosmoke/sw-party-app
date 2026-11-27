@@ -2152,16 +2152,29 @@ async function prGenHF(c,say){
   const tok=hfTok(); if(!tok){ say("כדי ליצור איור צריך לשמור טוקן של Hugging Face ב״הגדרות״ (במצב מנחה). אפשר גם להעתיק את ההנחיה ולהשתמש בה ב־Gemini."); return; }
   const prompt=($("prPrompt").value||portraitPrompt(c)).trim().slice(0,900);
   PR_BUSY=true; $("prGen").disabled=true; $("prAgain").disabled=true; say("יוצר איור… זה לוקח בדרך כלל חצי דקה עד דקה.");
+  let blob=null, st=0;
   try{
-    const r=await fetch("https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",{method:"POST",
-      headers:{"Authorization":"Bearer "+tok,"Content-Type":"application/json","Accept":"image/png"},
-      body:JSON.stringify({inputs:prompt,parameters:{width:768,height:1024,num_inference_steps:4}})});
-    if(!r.ok){ say(r.status===401||r.status===403?"Hugging Face דחה את הטוקן. בדקו שהוא נכון ושיש לו הרשאה ל־Inference Providers.":
-      r.status===402?"נגמרה מכסת השימוש החינמית של Hugging Face לחודש הזה.":r.status===429?"יותר מדי בקשות. נסו שוב בעוד דקה.":
-      r.status===503?"המודל עוד נטען אצל Hugging Face. נסו שוב בעוד דקה.":"היצירה נכשלה ("+r.status+"). נסו שוב."); return; }
-    const blob=await r.blob(); if(!/^image\//.test(blob.type||"image/")){ say("Hugging Face החזיר תשובה בלי תמונה. נסו שוב."); return; }
+    /* 1. Inference Providers, through Hugging Face's own client: it picks a provider that serves the model (fal and others) */
+    try{ const mod=await import("https://cdn.jsdelivr.net/npm/@huggingface/inference@4.13.33/+esm");
+      const client=new mod.InferenceClient(tok);
+      blob=await client.textToImage({provider:"auto",model:"black-forest-labs/FLUX.1-schnell",inputs:prompt,parameters:{width:768,height:1024,num_inference_steps:4}});
+    }catch(e){ st=(e&&e.httpResponse&&e.httpResponse.status)||(e&&e.status)||0; console.warn("HF providers",e); }
+    /* 2. the FLUX.1 Schnell Space (the same one Claude's connector uses), on the account's free GPU minutes */
+    if(!blob&&st!==401&&st!==403){ say("מנסה דרך אחרת ב־Hugging Face…");
+      try{ const base="https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer", H={"Authorization":"Bearer "+tok,"Content-Type":"application/json"};
+        const r1=await fetch(base,{method:"POST",headers:H,body:JSON.stringify({data:[prompt,0,true,768,1024,4]})});
+        if(!r1.ok){ st=r1.status; throw 0; }
+        const {event_id}=await r1.json(); const r2=await fetch(base+"/"+event_id,{headers:{"Authorization":"Bearer "+tok}}); const t=await r2.text();
+        const m=t.match(/event: complete\s*\ndata: (.*)/); if(!m){ st=st||(/error/.test(t)?429:0); throw 0; }
+        const out=JSON.parse(m[1]), im=out&&out[0], url=im&&(im.url||(im.path?"https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/file="+im.path:""));
+        if(url){ const r3=await fetch(url,{headers:{"Authorization":"Bearer "+tok}}); if(r3.ok) blob=await r3.blob(); }
+      }catch(e){ if(e) console.warn("HF space",e); }
+    }
+    if(!blob){ say(st===401||st===403?"Hugging Face דחה את הטוקן. בדקו שהוא נכון ושיש לו הרשאה ל־Inference Providers (Make calls to Inference Providers).":
+      st===402?"נגמרה מכסת השימוש החינמית של Hugging Face לחודש הזה.":st===429?"יותר מדי בקשות, או שנגמרו דקות ה־GPU היומיות. נסו שוב מאוחר יותר.":
+      "היצירה נכשלה"+(st?" ("+st+")":"")+". נסו שוב בעוד רגע."); return; }
     PR_NEW=await shrinkPortrait(blob); $("prNewImg").src=PR_NEW; $("prNew").hidden=false; say("הנה האיור. אפשר להשתמש בו או לנסות שוב.");
-  }catch(e){ say("לא הצלחתי להגיע ל־Hugging Face. בדקו את האינטרנט ונסו שוב."); }
+  }catch(e){ say("לא הצלחתי לקרוא את התמונה שהתקבלה. נסו שוב."); }
   finally{ PR_BUSY=false; const g=$("prGen"), a=$("prAgain"); if(g) g.disabled=frozen(); if(a) a.disabled=false; }
 }
 function prPrint(){
