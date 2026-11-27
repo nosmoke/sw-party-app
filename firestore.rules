@@ -28,6 +28,16 @@ service cloud.firestore {
       }
     }
 
+    // DMs list: each Google account writes only its own entry, only the manager reads the list
+    match /dms/{uid} {
+      allow create: if google() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(["email", "first", "last", "visits"]) && request.resource.data.email == email();
+      allow update: if google() && uid == request.auth.uid
+        && changes().hasOnly(["email", "last", "visits"]) && request.resource.data.email == email();
+      allow get: if google() && uid == request.auth.uid;
+      allow get, list, delete: if admin();
+    }
+
     // anonymous visit counting: each device writes its own visits, only the manager reads them
     match /visits/{id} {
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid

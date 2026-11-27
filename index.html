@@ -252,7 +252,7 @@ body.ext .not-ext{display:none}
 .st-days{display:grid;gap:3px}.st-day{display:grid;grid-template-columns:9.5em minmax(0,1fr) 4.5em;gap:8px;align-items:center;font-size:.82rem}
 .st-bar{height:10px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden}.st-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
 .st-n{font-variant-numeric:tabular-nums;text-align:start}
-.app.player #gmStats{display:none}
+.app.player #gmStats,.app.player #gmDms{display:none}
 .btn.mode{font-weight:600}.app.dm .btn.mode{border-color:var(--accent);color:var(--accent)}
 .frozen-note{margin:0;padding:8px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);font-size:.9rem}
 .frozen-note[hidden]{display:none}
@@ -1497,7 +1497,7 @@ async function connect(){
     if(!db||!user){setSave("נשמר במכשיר הזה בלבד. התחברו ל־Claude כדי לשמור בין מכשירים");return;}
     const id=await user.id(); if(!id){setSave("נשמר במכשיר הזה בלבד");return;}
     dbRef=db; uidRef=id;
-    if(EXT) logVisit();
+    if(EXT){ logVisit(); dmTouch(); }
     if(EXT&&!GAME){ setSave("לא מחובר למשחק: נשמר במכשיר הזה בלבד"); renderGame(); return; }
     const want=GAME; store=EXT?db.doc("games/"+GAME):db.doc("data/users/"+id+"/shop");
     const timer=setTimeout(()=>setSave("החשבון לא עונה כרגע; העבודה נשמרת במכשיר הזה"),10000);
@@ -1680,7 +1680,7 @@ function renderGame(){
     else if(Array.isArray(list)) h+=gameRows(list,admin);
   }
   h+=`<p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות באופן אנונימי (מתי, סוג המכשיר ולאיזה משחק), לצורך ניהול בלבד.</p></div>`;
-  if(google&&admin) h+=`<div id="gmStats" data-tab="stats">${statsHTML()}</div>`;
+  if(google&&admin) h+=`<div id="gmStats" data-tab="stats">${statsHTML()}</div><div id="gmDms" data-tab="dms"></div>`;
   box.innerHTML=h; bkSummary();
   const on=(id,f)=>{ const e=$(id); if(e) e.onclick=f; };
   on("gmCopy",async()=>{ try{ await navigator.clipboard.writeText(GAME); toast("הקוד הועתק"); }catch(e){ toast("הקוד: "+isoCode(GAME)); } });
@@ -1703,6 +1703,7 @@ function renderGame(){
   const sb=$("stRefresh"); if(sb) sb.onclick=statsLoad;
   if(google&&online&&(admin?GLIST:MYLIST)==null) gmLoadList();
   if(admin&&online&&STATS==null) statsLoad();
+  if(admin&&google){ dmsPaint(); if(online&&DMS==null) dmsLoad(); }
   renderHF(); renderSetTabs();
 }
 /* the settings panel shows one part at a time; which parts exist depends on the version, the mode and the account */
@@ -1710,7 +1711,7 @@ let SET_TAB="";
 function renderSetTabs(){
   const bar=$("setTabs"); if(!bar) return;
   const dm=MODE==="dm", admin=!!(EXT&&EXT.isAdmin&&EXT.isAdmin()&&gGoogle());
-  const tabs=EXT?[["game","משחק"],["acct","חשבון מנחה"],["hf","איורים"],...(admin&&dm?[["stats","כניסות"]]:[]),...(dm?[["backup","גיבוי"]]:[])]:[["backup","גיבוי"]];
+  const tabs=EXT?[["game","משחק"],["acct","חשבון מנחה"],["hf","איורים"],...(admin&&dm?[["stats","כניסות"],["dms","מנחים"]]:[]),...(dm?[["backup","גיבוי"]]:[])]:[["backup","גיבוי"]];
   if(!tabs.some(t=>t[0]===SET_TAB)) SET_TAB=tabs[0][0];
   bar.hidden=tabs.length<2;
   bar.innerHTML=tabs.map(([k,l])=>`<button type="button" role="tab" data-st="${k}" aria-selected="${k===SET_TAB}">${l}</button>`).join("");
@@ -1722,11 +1723,48 @@ async function gSignIn(){
   catch(e){ const er=$("gmErr")||$("modeErr"); if(er) er.textContent="הכניסה עם Google לא הושלמה"; }
 }
 if(EXT&&EXT.onAuth) EXT.onAuth(()=>{
-  GLIST=null; MYLIST=null; STATS=null;
+  GLIST=null; MYLIST=null; STATS=null; DMS=null; dmTouch();
   if(MODE==="dm"&&GAME&&!gIsDM()) setMode("player");
   if(MG_OPEN&&MODE==="player"&&GAME) modeGame();   /* the dialog follows the account: into DM mode, or says this account is not a DM */
   renderGame(); renderModeBtn();
 });
+
+/* ---------- the DMs list: each Google sign-in records its account once per visit, only the manager reads the list ---------- */
+let DMS=null, DM_TOUCHED="";
+let DM_P=null;
+function dmTouch(){ DM_P=dmTouch1(); return DM_P; }
+async function dmTouch1(){
+  if(!EXT||!dbRef||!gGoogle()) return; const id=EXT.uid(); if(DM_TOUCHED===id) return; DM_TOUCHED=id;
+  const ref=dbRef.doc("dms/"+id), now=new Date().toISOString();
+  try{ const sn=await ref.get();
+    if(sn.exists){ const d=sn.data()||{}; await ref.update({email:gEmail(),last:now,visits:(Number(d.visits)||0)+1}); }
+    else await ref.set({email:gEmail(),first:now,last:now,visits:1});
+  }catch(e){ console.warn("dms",e); }
+}
+async function dmsLoad(){
+  if(!EXT||!EXT.isAdmin()||!dbRef) return; DMS="loading"; dmsPaint();
+  try{ await DM_P; }catch(e){}
+  try{ DMS=(await dbRef.collection("dms").get()).docs.map(d=>Object.assign({uid:d.id},d.data())).sort((a,b)=>String(b.last).localeCompare(String(a.last))); }
+  catch(e){ console.warn(e); DMS="error"; }
+  if(!Array.isArray(GLIST)) await gmLoadList();
+  dmsPaint();
+}
+function dmsPaint(){
+  const box=$("gmDms"); if(!box) return;
+  let h=`<div class="gm-row"><span class="muted small">כל מי שנכנס לאפליקציה עם חשבון Google</span><button class="btn small" id="dmsRefresh">רענון</button></div>`;
+  if(DMS==null||DMS==="loading") h+=`<p class="muted small">טוען…</p>`;
+  else if(DMS==="error") h+=`<p class="small">לא הצלחתי לטעון את הרשימה. אם עוד לא עדכנת את חוקי האבטחה ב־Firebase, זו כנראה הסיבה.</p>`;
+  else if(!DMS.length) h+=`<p class="muted small">עוד אין מנחים ברשימה. מנחה נוסף לרשימה בכניסה הבאה שלו עם Google.</p>`;
+  else{
+    const G2=Array.isArray(GLIST)?GLIST:[];
+    h+=`<ul class="gm-list">${DMS.map(d=>{ const em=String(d.email||"").toLowerCase(), own=G2.filter(g=>g.owner===d.uid), co=G2.filter(g=>g.owner!==d.uid&&g.dms.map(x=>String(x).toLowerCase()).includes(em));
+      return `<li><div class="gm-meta"><b style="direction:ltr;unicode-bidi:isolate">${esc(d.email||"")}</b>${em===String(EXT.email()||"").toLowerCase()?` <span class="muted small">(את/ה)</span>`:""}
+        <div class="muted small">כניסה ראשונה ${esc(gmDate(d.first))} · אחרונה ${esc(gmDate(d.last))}${d.visits?` · ${d.visits==1?"ביקור אחד":d.visits+" ביקורים"}`:""}</div>
+        <div class="small">${own.length?`בעלים של ${own.length===1?"משחק אחד":own.length+" משחקים"}: ${own.map(g=>esc(g.name||fmtCode(g.code))).join(", ")}`:"אין משחקים בבעלותו"}${co.length?` · מנחה נוסף ב־${co.map(g=>esc(g.name||fmtCode(g.code))).join(", ")}`:""}</div></div></li>`; }).join("")}</ul>
+      <p class="muted small">${DMS.length===1?"מנחה אחד":DMS.length+" מנחים"}. מי שנכנס לפני שהרשימה נוספה יופיע בכניסה הבאה שלו.</p>`;
+  }
+  box.innerHTML=h; const r=$("dmsRefresh"); if(r) r.onclick=dmsLoad;
+}
 
 /* ---------- anonymous visit counting (hosted version) ---------- */
 const DEV_ID=(()=>{ try{ let d=localStorage.getItem("sw-dev"); if(!d){ d=Math.random().toString(36).slice(2,12); localStorage.setItem("sw-dev",d); } return d; }catch(e){ return "?"; } })();
