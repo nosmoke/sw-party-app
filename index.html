@@ -511,7 +511,9 @@ svg.d20{width:1.15em;height:1.15em;vertical-align:-.22em;fill:none;stroke:curren
 .app.v-adv .minibar .mb-adv{display:flex}
 .app.compact.v-adv .adv-top{display:none}
 @media (max-width:560px){.adv-top{position:static}}
-.verbtn{position:fixed;bottom:4px;left:8px;z-index:30;font-size:.72rem;color:var(--muted);background:color-mix(in srgb,var(--bg) 70%,transparent);border:0;border-radius:4px;padding:1px 6px;cursor:pointer;text-decoration:underline dotted}
+.vb-short{display:none}@media (max-width:640px){.vb-long{display:none}.vb-short{display:inline}}
+.rel-h{margin:10px 0 4px;font-size:.95rem}.credits{margin:0 0 4px;padding-inline-start:18px;font-size:.85rem;line-height:1.5}
+.verbtn{max-width:calc(100vw - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:fixed;bottom:4px;left:8px;z-index:30;font-size:.72rem;color:var(--muted);background:color-mix(in srgb,var(--bg) 70%,transparent);border:0;border-radius:4px;padding:1px 6px;cursor:pointer;text-decoration:underline dotted}
 .relnotes{position:fixed;z-index:41;bottom:28px;left:16px;right:16px;margin-inline:auto;max-width:620px;max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .relnotes[hidden]{display:none}
 .relnotes ul{margin:8px 0 0;padding-inline-start:18px;font-size:.88rem}
@@ -1000,8 +1002,20 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
 </div>
 
 <button class="verbtn" id="verBtn" type="button"></button>
-<section class="relnotes" id="relPanel" hidden aria-label="מה חדש">
-  <div class="bk-row"><b>מה חדש באפליקציית החבורה</b><button class="btn small ghost" id="relClose" aria-label="סגירה">✕</button></div>
+<section class="relnotes" id="relPanel" hidden aria-label="קרדיטים ומה חדש">
+  <div class="bk-row"><b>אפליקציית החבורה</b><button class="btn small ghost" id="relClose" aria-label="סגירה">✕</button></div>
+  <h4 class="rel-h">קרדיטים</h4>
+  <ul class="credits">
+    <li><b>האפליקציה:</b> גיא הראל־עילם, נבנתה בעזרת Claude (Anthropic).</li>
+    <li><b>חוקי המשחק:</b> חרבות וכשפים, צוות חרבות וכשפים. מבוסס על חוקי הליבה של Swords &amp; Wizardry מאת מת'יו ג. פינץ'.</li>
+    <li><b>הצלת ליאם:</b> מתוך החוברת למנחה המתחילה, צוות חרבות וכשפים.</li>
+    <li><b>מקדש הגובלינים:</b> ערן בן־סער מולוט, צוות חרבות וכשפים. מפה: xploringmap.</li>
+    <li><b>אל תוך מקדש הצפע:</b> איתי אסף רייזמן־גרייף, צוות חרבות וכשפים. מפה: Dyson Logos.</li>
+    <li><b>קבר מלכי הנחשים:</b> Skerples. איורים: Scrap Princess. מפה: Janon, התאמה: נבות רם. תרגום: איתי חורב ועודד דויטש. המרה לחרבות וכשפים: איתי חורב, עודד דויטש וערן בן־סער. ברישיון <span dir="ltr">CC BY-NC-SA 4.0</span>.</li>
+    <li><b>איורי הדמויות:</b> נוצרים במודל FLUX.1 schnell של Black Forest Labs, דרך Hugging Face.</li>
+  </ul>
+  <p class="muted small">כל הזכויות על החוקים וההרפתקאות שמורות לבעליהן. האפליקציה לשימוש אישי ולא מסחרי.</p>
+  <h4 class="rel-h">מה חדש</h4>
   <ul id="relList"></ul>
 </section>
 
@@ -4557,7 +4571,7 @@ function advInit(){
     else return;
     schedule(); renderAdv(); renderMbAdv(); if(typeof renderQuest==="function"&&!$("questPane")?.hidden) renderQuest();});
   /* version + release notes */
-  $("verBtn").textContent="גרסה "+APP_VERSION;
+  $("verBtn").innerHTML=`גרסה ${esc(APP_VERSION)}<span class="vb-long"> · מבוסס על חרבות וכשפים · נבנה על ידי גיא הראל־עילם בעזרת Claude</span><span class="vb-short"> · גיא הראל־עילם · קרדיטים</span>`;
   $("relList").innerHTML=RELEASES.map(([v,t])=>`<li><b>${v}</b> ${esc(t)}</li>`).join("");
   $("verBtn").onclick=()=>{$("relPanel").hidden=!$("relPanel").hidden;};
   $("relClose").onclick=()=>{$("relPanel").hidden=true;};
