@@ -1676,8 +1676,8 @@ function gmReset(){
 /* reset everything outside a game: this device's party */
 function resetAll(){
   if(MODE!=="dm") return;
-  ask("לאפס את כל הנתונים?",`כל ${state.chars.length} הדמויות (${state.chars.map(c=>c.name).join(", ")}), האיורים, מעקב ההרפתקה, ספר ההרפתקה וסיסמת המנחה (תחזור ל־${PW_DEFAULT}) יימחקו מהמכשיר הזה. כדאי לשמור גיבוי לפני כן.`,"איפוס הכול",()=>{
-    state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); bkSummary(); toast("הכול אופס. סיסמת המנחה חזרה ל־"+PW_DEFAULT);
+  ask("לאפס את כל הנתונים?",`כל ${state.chars.length} הדמויות (${state.chars.map(c=>c.name).join(", ")}), האיורים, מעקב ההרפתקה, ספר ההרפתקה ושאר הנתונים יימחקו מהמכשיר הזה. כדאי לשמור גיבוי לפני כן.`,"איפוס הכול",()=>{
+    state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); bkSummary(); toast("הכול אופס");
   });
 }
 /* each game a DM owns takes one of five slots, dms/{uid}/slots/{1..5}; the game and its slot are written together, and the rules check both */
@@ -1842,10 +1842,10 @@ async function gSignIn(){
 if(EXT&&EXT.onAuth) EXT.onAuth(()=>{
   visitHandoff();
   GLIST=null; MYLIST=null; STATS=null; DMS=null; LIB=null; QINDEX=null; for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; dmTouch();
-  if(MODE==="dm"&&GAME&&!gIsDM()) setMode("player");
+  if(MODE==="dm"&&(!gGoogle()||(GAME&&!gIsDM()))) setMode("player");
   if(GAME&&!gIsDM()&&(SEC_READY||secUnsub)) secReset();
   secEnsure();
-  if(MG_OPEN&&MODE==="player"&&GAME) modeGame();   /* the dialog follows the account: into DM mode, or says this account is not a DM */
+  if(MG_OPEN&&MODE==="player") modeGame();   /* the dialog follows the account: into DM mode, or says this account is not a DM */
   renderGame(); renderModeBtn();
 });
 
@@ -2732,19 +2732,13 @@ function renderAll(){renderTabs();renderPanel();renderStatus();renderCatalog();r
 
 /* ---------- player / DM mode. Per device; the app always opens in player mode ---------- */
 let MODE="player";
-const PW_EPOCH="1";   /* bumping this resets the DM password to the default (done on request in a chat with Claude) */
-const PW_DEFAULT="123456";
 /* an adventure is running while a book is open in the adventure book, a fight is on, or time has started in the tracker */
 const advRunning=()=>!!(state.quest&&state.quest.active)||!!(state.adv&&(state.adv.combat||(Number(state.adv.sec)||0)>0));
 const frozen=()=>MODE==="player"&&advRunning();
-async function pwHash(p){ const t="sw-dm:"+p;
-  try{ const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
-  catch(e){ let h=7; for(const ch of t) h=(h*31+ch.charCodeAt(0))|0; return "x"+h; } }
-async function pwOk(p){ const d=state.dm; if(!d||d.epoch!==PW_EPOCH||!d.hash) return p===PW_DEFAULT; return (await pwHash(p))===d.hash; }
 /* a twenty-sided die, the game's own die, in place of the six-sided emoji */
 function d20(){ return '<svg class="d20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2L21 7V17L12 22L3 17V7Z M12 6.5L17.2 15.5H6.8Z M12 2V6.5 M3 7L12 6.5L21 7 M3 7L6.8 15.5 M21 7L17.2 15.5 M3 17L6.8 15.5 M21 17L17.2 15.5 M12 22L6.8 15.5 M12 22L17.2 15.5"/></svg>'; }
 function renderModeBtn(){ const b=$("modeBtn"); if(!b) return; b.innerHTML=MODE==="dm"?"🛡 מצב מנחה":d20()+" מצב שחקנים";
-  b.title=MODE==="dm"?(EXT&&GAME?"חזרה למצב שחקנים":"חזרה למצב שחקנים או שינוי הסיסמה"):(EXT&&GAME?"מעבר למצב מנחה (למנחי המשחק שמחוברים עם Google)":"מעבר למצב מנחה (דורש סיסמה)"); }
+  b.title=MODE==="dm"?"חזרה למצב שחקנים":(GAME?"מעבר למצב מנחה (למנחי המשחק שמחוברים עם Google)":"מעבר למצב מנחה (דורש כניסה עם Google)"); }
 function modeDlg(title,body,acts){
   $("modeTitle").textContent=title; $("modeBody").innerHTML=body; $("modeErr").textContent="";
   const a=$("modeActs"); a.innerHTML="";
@@ -2754,42 +2748,21 @@ function modeDlg(title,body,acts){
 let MG_OPEN=false;
 function modeClose(){ $("modeScrim").hidden=true; MG_OPEN=false; }
 function setMode(m){ MODE=m; if(m==="dm") for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; applyView(); renderAll(); renderGame(); renderSetTabs(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
-$("modeBtn").onclick=()=>{
-  if(EXT&&GAME) return modeGame();
-  if(MODE==="player"){
-    const go=async()=>{ const p=$("pwIn").value; if(await pwOk(p)){ modeClose(); setMode("dm"); } else { $("modeErr").textContent="הסיסמה שגויה"; $("pwIn").select(); } };
-    const d=state.dm, dflt=!d||d.epoch!==PW_EPOCH||!d.hash;
-    modeDlg("מעבר למצב מנחה",`<label for="pwIn">סיסמת המנחה</label><input type="password" id="pwIn" autocomplete="current-password" ${dflt?'aria-describedby="pwHint"':""}>`+(dflt?`<p class="muted small" id="pwHint">ברירת המחדל של הסיסמה היא <b style="direction:ltr;unicode-bidi:isolate">${PW_DEFAULT}</b>. אחרי הכניסה כדאי לשנות אותה (לחיצה על ״מצב מנחה״ ← שינוי הסיסמה). כשהסיסמה תשתנה, השורה הזו תיעלם.</p>`:""),[["כניסה","primary",go],["ביטול","",modeClose]]);
-    $("pwIn").onkeydown=e=>{ if(e.key==="Enter") go(); };
-  } else {
-    modeDlg("מצב מנחה",`<p>במצב מנחה כל המסכים פתוחים, ואפשר לשנות הכול גם בזמן הרפתקה. בכל פתיחה האפליקציה חוזרת למצב שחקנים.</p>`,
-      [["חזרה למצב שחקנים","primary",()=>{modeClose();setMode("player");}],["שינוי הסיסמה","",pwChange],["סגירה","",modeClose]]);
-  }
-};
-/* hosted games: DM mode by Google account instead of a password */
+$("modeBtn").onclick=()=>modeGame();
+/* DM mode always needs a Google sign-in; in a game, the account must also be one of the game's DMs */
 function modeGame(){
   if(MODE==="dm"){
     modeDlg("מצב מנחה",`<p>במצב מנחה כל המסכים פתוחים, ואפשר לשנות הכול גם בזמן הרפתקה. בכל פתיחה האפליקציה חוזרת למצב שחקנים.</p><p class="muted small">מחובר כ־<span style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</span></p>`,
       [["חזרה למצב שחקנים","primary",()=>{modeClose();setMode("player");}],["סגירה","",modeClose]]);
     return;
   }
-  if(gIsDM()){ modeClose(); setMode("dm"); return; }
   const g=gGoogle();
+  if(!EXT){ modeDlg("מעבר למצב מנחה",`<p>מצב מנחה דורש כניסה עם חשבון Google, ואין כרגע חיבור לשרת. בודקים את החיבור לאינטרנט ומנסים שוב.</p>`,[["סגירה","primary",modeClose]]); return; }
+  if(g&&(!GAME||gIsDM())){ modeClose(); setMode("dm"); return; }
   modeDlg("מעבר למצב מנחה",g?`<p>החשבון <b style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</b> אינו מנחה במשחק הזה.</p><p class="muted small">בעלי המשחק יכולים להוסיף אותו ב״הגדרות״ ← ״מנחי המשחק״. אפשר גם להיכנס עם חשבון Google אחר.</p>`
-      :`<p>במשחק הזה מצב מנחה פתוח רק למנחים שמחוברים עם חשבון Google.</p>`,
+      :`<p>מצב מנחה פתוח רק למנחים שמחוברים עם חשבון Google.</p>${GAME?`<p class="muted small">במשחק הזה החשבון צריך להיות רשום כמנחה של המשחק.</p>`:""}`,
     [[g?"החלפת חשבון Google":"כניסה עם Google","primary",async()=>{ if(g){ visitTouch(true); try{ await EXT.signOutGoogle(); }catch(e){} } gSignIn(); }],["ביטול","",modeClose]]);
   MG_OPEN=true;
-}
-function pwChange(){
-  const go=async()=>{ const a=$("pwOld").value,b=$("pwNew").value,c=$("pwNew2").value;
-    if(!(await pwOk(a))){ $("modeErr").textContent="הסיסמה הנוכחית שגויה"; return; }
-    if(b.length<4){ $("modeErr").textContent="בסיסמה החדשה צריכים להיות לפחות 4 תווים"; return; }
-    if(b!==c){ $("modeErr").textContent="שתי הסיסמאות החדשות לא זהות"; return; }
-    state.dm={hash:await pwHash(b),epoch:PW_EPOCH}; schedule(); modeClose(); toast("הסיסמה עודכנה"); };
-  modeDlg("שינוי סיסמת המנחה",`<label>הסיסמה הנוכחית<input type="password" id="pwOld" autocomplete="current-password"></label>
-    <label>סיסמה חדשה<input type="password" id="pwNew" autocomplete="new-password"></label>
-    <label>שוב את הסיסמה החדשה<input type="password" id="pwNew2" autocomplete="new-password"></label>
-    <p class="muted small">${GAME?"הסיסמה שייכת למשחק הזה, ולכן היא חלה על כל המכשירים שמחוברים אליו.":"המכשיר לא מחובר למשחק, ולכן הסיסמה חלה רק עליו."} אם שכחת אותה, אפשר לבקש מ־Claude בשיחה לאפס אותה ל־123456.</p>`,[["שמירה","primary",go],["ביטול","",modeClose]]);
 }
 $("modeScrim").addEventListener("click",e=>{ if(e.target===$("modeScrim")) modeClose(); });
 
