@@ -256,8 +256,16 @@ body.ext .not-ext{display:none}
 .pr-ai-acts{display:flex;flex-wrap:wrap;gap:6px}.pr-new{display:flex;gap:10px;align-items:flex-start;margin-top:6px}.pr-new[hidden]{display:none}
 .pr-new img{width:120px;height:160px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff}
 #prScrim .dialog{max-height:90dvh;overflow-y:auto}
-.rl-dlg{max-width:560px;max-height:90vh;max-height:90dvh;overflow-y:auto}
+.dialog.rl-dlg{max-width:560px;max-height:90vh;max-height:90dvh;overflow-y:auto}
 .rl-dlg p{margin:6px 0 8px}
+.gen-f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:6px 0 10px}
+.gen-f label{display:flex;flex-direction:column;gap:3px;font-size:.88rem}.gen-f select{font-size:16px;padding:5px 6px}
+.gen-f .gen-ck{flex-direction:row;align-items:center;gap:6px;align-self:end}
+.gen-card{border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin-top:8px}
+.gen-card h4{margin:0 0 2px;font-size:1.15rem}
+.gen-ab{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 10px;font-size:.9rem;margin:6px 0}
+.gen-ab .rl-pr{color:var(--accent);font-weight:700}
+@media(max-width:480px){.gen-f,.gen-ab{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .rl-btn{float:left;font-size:.8rem}
 .rl-note{margin:6px 0 0}
 .rl-ms{border:0;padding:0;margin:0 0 6px;display:grid;gap:4px}.rl-ms legend{font-weight:600;margin-bottom:4px}
@@ -993,6 +1001,14 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
     <div id="prBody"></div>
     <p class="muted small not-ext">בתוך Claude הדפדפן לא מאפשר לפתוח הדפסה ישירות. לכן הדף נשמר כקובץ: פותחים אותו, והוא נשלח להדפסה מעצמו.</p>
     <div class="acts"><button class="btn primary" id="prDl">שמירה והדפסה</button><button class="btn" id="prCancel">ביטול</button></div>
+  </div>
+</div>
+<div class="scrim" id="genScrim" hidden>
+  <div class="dialog rl-dlg" role="dialog" aria-modal="true" aria-labelledby="genTitle">
+    <h3 id="genTitle" tabindex="-1">מגריל דמויות</h3>
+    <p class="small">בוחרים סוג דמות ושיטת גלגול, והאפליקציה בונה דמות שלמה בדרגה 1. אפשר להגריל שוב עד שמוצאים דמות שאוהבים.</p>
+    <div id="genBody"></div>
+    <div class="acts"><button class="btn primary" id="genSave" disabled>שמירה כדמות חדשה</button><button class="btn" id="genCancel">ביטול</button></div>
   </div>
 </div>
 <div class="scrim" id="rollScrim" hidden>
@@ -1853,6 +1869,144 @@ function rollNote(c){
   return `${ROLL_M[r.m]?ROLL_M[r.m].n:""} · ${r.n===1?"גלגול אחד":r.n+" גלגולים"} · ${gmDate(r.appliedAt||r.at)}`;
 }
 
+/* ---------- random character generator ----------
+   Rules used: abilities by the chosen method (ש 19, מ 32, house rule 1); HP = hit die + CON + 5, rerolling a 1 up to 3 times (ש 45–46, house rule 2);
+   money 3ק6×10 (ש 41); the class's recommended kit (ש 45 and the app's kits for the advanced classes), then useful extras while money and carrying capacity allow;
+   languages by INT (ש 21); starting spells: wizard 4–5, elf archer 2–3 (ש 47); rune-smith 2 tattoos (מת' 41); half-elf wayfarer 2–3 like the elf (my reading).
+   Ages, names and the extras list are the app's own choices: the books give only adulthood ages for some races. */
+const GEN_RACE={thief:"h",cleric:"h",fighter:"h",wizard:"h",paladin:"h",druid:"h",elf:"e",runesmith:"e",halfling:"l",bard:"l",dwarf:"d",stonew:"d",pathf:"x"};
+const GEN_NAMES={
+  h:{m:["אדריק","גראון","טורן","ברם","קאלן","דורן","לוריאן","סאבר","מרדוק","אלדר","ריבן","יואש","עידו","נתור"],f:["סלין","מירה","אוריאן","קירה","דלית","ערבה","שחר","יסמין","טליה","רונה","אסנת","לביאה","נגה","ורד"],
+     s:["אור־בוקר","תל־ים","אבן־שחר","בן־זאב","מגדל־עוז","שער־רוח","קול־ענן","בית־אש","עמק־ארז","גשר־אבן"]},
+  e:{m:["אלוואריון","גלנדיר","תלמאר","סילוואן","איתריל","פאלאנור","ערבאל","לירנדיר","נאריאל","אוריסל"],f:["אלנוויה","סילנה","מירית","טלריאן","אורלית","ענבריה","לותיאל","נימריאל","אילוונה","פאיה"],
+     s:["עץ־חיים","עלה־כסף","רוח־יער","זוהר־ירח","קשת־שחר","מעיין־אור","שורש־אלון","טל־בוקר"]},
+  d:{m:["תורגן","בלגור","דורגן","גרים","ברוק","קילדור","הורגר","דוראק","בורין","גמלי"],f:["דגנה","ברונה","הילגה","גרטה","ונדה","קרנה","סיגרון","אסטריד","דיסה","ברנהילד"],
+     s:["פטיש־סלע","זקן־ברזל","מכרה־עמוק","אבן־אש","יד־פלדה","הר־אפור","סדן־כבד","מעוז־גרניט"]},
+  l:{m:["ניבי","טוביאס","מילו","ברנדו","פודי","לוטם","גוזל","שקדי","בונדו","טימו"],f:["פלפלת","ליליה","מרגנית","תות","סביונה","חמנית","רוזי","פרחית","דבורה","צופית"],
+     s:["קסנן","גבעת־יין","רגל־קלה","תה־חם","חבית־דבש","שדה־תלתן","כיס־מלא","כרם־ירוק"]},
+  x:{m:["איתרן","לוריס","קאלדור","סלבן","תאריאל","דאריס","ארן","מליאור"],f:["אליסה","נאריה","סילבי","תאליה","מיריאל","אורנה","לייסה","קאלי"],
+     s:["בין־עולמות","דרך־רחוקה","רוח־נודדת","צל־יער","שביל־ירח","אופק־כסוף"]}
+};
+const GEN_AGE={h:[16,3,6],e:[100,5,10],l:[30,2,10],d:[50,3,10],x:[20,3,10]};   /* base + NdX (app's choice; adulthood: elf 100 ש 37, halfling 30 ש 38, dwarf 50 ש 39) */
+const GEN_EXTRA=[["ration",4],["torch",3],["waterskin",1],["tinder",1],["rope",1],["oil",2,"lantern"],["holywater",1,"cleric"],["garlic",1],["chalk",1],["sackS",2],["spike",6],["mirror",1],["pole",1],["candle",3]];
+const rnd=n=>{ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%n; };
+const pick=a=>a[rnd(a.length)];
+const dice=(n,x)=>{ let s=0; for(let i=0;i<n;i++) s+=1+rnd(x); return s; };
+function genLine(id,q){
+  const it=BY[id]; if(!it) return null; q=q||1;
+  if(it.pack) return {key:uid(),ref:id,name:it.uname||it.name,p:it.p/it.pack,w:(it.w||0)/it.pack,qty:q*it.pack,pack:it.pack,ride:false,meta:it.meta||""};
+  return {key:uid(),ref:id,name:it.name,p:it.p,w:it.w||0,qty:q,ride:!!it.ride,meta:it.meta||""};
+}
+function genAbilities(c,method,pool){
+  const P=PROG[c.cls], prime=P&&P.prime?P.prime:[];
+  const order=[...ABIL.filter(([k])=>prime.includes(k)),...ABIL.filter(([k])=>!prime.includes(k)).sort(()=>rnd(3)-1)];
+  if(method==="points"){
+    pool=pool||66; const v={}; const per=prime.length>=3?14:prime.length===2?15:16;
+    for(const [k] of ABIL) v[k]=prime.includes(k)?per:3;
+    let left=pool-ABIL.reduce((s,[k])=>s+v[k],0); const others=ABIL.filter(([k])=>!prime.includes(k)).map(([k])=>k);
+    while(left>0){ const k=pick(others.filter(k=>v[k]<14).length?others.filter(k=>v[k]<14):ABIL.map(a=>a[0]).filter(k=>v[k]<18)); if(!k) break; v[k]++; left--; }
+    for(const [k] of ABIL) c[k]=v[k];
+    c.abRoll={m:"points",pool,at:new Date().toISOString(),applied:true,sets:[],n:1};
+    return;
+  }
+  const M=ROLL_M[method], n=method==="multi"?4:M.sets, sets=rollSets(method,n);
+  /* the set with the best prime scores, then the best total */
+  const score=s=>{ const v=s.map(x=>x.v).sort((a,b)=>b-a); return v.slice(0,Math.max(1,prime.length)).reduce((a,b)=>a+b,0)*100+v.reduce((a,b)=>a+b,0); };
+  let best=0; sets.forEach((s,i)=>{ if(score(s)>score(sets[best])) best=i; });
+  const vals=sets[best].map((x,i)=>[x.v,i]).sort((a,b)=>b[0]-a[0]);
+  const asg={}; order.forEach(([k],j)=>{ asg[k]=vals[j][1]; c[k]=vals[j][0]; });
+  c.abRoll={n:1,m:method,at:new Date().toISOString(),sets,applied:true,chosen:best,appliedAt:new Date().toISOString(),auto:true};
+}
+function genGear(c){
+  const kit=(KITS_BOOK.find(k=>k.id===c.cls)||KITS_MINE.find(k=>k.id===c.cls)||{items:[]}).items.slice();
+  if(KITS_BOOK.some(k=>k.id===c.cls)) kit.push(...KITS_BOOK.find(k=>k.id==="all").items);
+  if(isBookCls(c)&&!PROG[c.cls].tattoos){ const i=kit.findIndex(([id])=>id==="spellbook"); const sb=i>=0?kit.splice(i,1)[0]:["spellbook"]; kit.unshift(sb); }
+  const cap=toD(limitOf(c)); let money=toC(c.money), wt=0; c.inv=[]; c.cart=[];
+  const C=CLASSES[c.cls];
+  const buy=(id,q)=>{ const it=BY[id]; if(!it) return false; q=q||1; const cost=toC(it.p)*q, w=it.ride?0:toD(it.w||0)*q;
+    if(cost>money||wt+w+coinD(money-cost)>cap) return false;
+    const ex=c.inv.find(l=>l.ref===id); const ln=genLine(id,q); if(ex) ex.qty+=ln.qty; else c.inv.push(ln); money-=cost; wt+=w; return true; };
+  for(const [id,q] of kit){
+    if(buy(id,q)) continue;
+    /* armor out of reach: the cheapest allowed armor that fits */
+    if(ARMOR_BODY.includes(id)){ const alt=(C.armor||[]).filter(a=>a!==id&&BY[a]).sort((a,b)=>BY[a].p-BY[b].p); for(const a of alt) if(buy(a)) break; }
+    else if(q>1) { for(let k=q-1;k>=1;k--) if(buy(id,k)) break; }
+  }
+  for(const [id,q,need] of GEN_EXTRA){
+    if(money<toC(5)) break;
+    if(need&&need!==c.cls&&!c.inv.some(l=>l.ref===need)) continue;
+    if(["ration","torch","waterskin","tinder","rope"].includes(id)&&c.inv.some(l=>l.ref===id)&&id!=="ration") continue;
+    buy(id,q);
+  }
+  c.spent=toC(c.money)-money;
+}
+function genSpells(c){
+  const P=PROG[c.cls]; c.book=[]; if(!isBookCls(c)) return;
+  const n=P.tattoos?2:c.cls==="wizard"?4+rnd(2):2+rnd(2);
+  const lv1=WSP.filter(s=>s[0]===1).map(s=>s[1]);
+  const first=["sleep","missile","readmagic","shield"].filter(id=>lv1.includes(id));
+  const pool=[...first.slice(0,2),...lv1.filter(id=>!first.slice(0,2).includes(id)).sort(()=>rnd(3)-1)];
+  c.book=pool.slice(0,n);
+}
+function genChar(cls,method,sex,gear){
+  const c=newChar(""); c.cls=cls; c.sex=sex||pick(["m","f"]); c.level=1; c.xp=0;
+  const R=GEN_RACE[cls]||"h", N=GEN_NAMES[R];
+  c.name=pick(N[c.sex])+" "+pick(N.s);
+  const [b,nd,x]=GEN_AGE[R]; c.age=String(b+dice(nd,x));
+  c.align=cls==="druid"?"neutral":["paladin","stonew"].includes(cls)?"order":(()=>{const r=rnd(20);return r<9?"order":r<18?"neutral":"chaos";})();
+  genAbilities(c,method);
+  const m=mods(c), P=PROG[cls], rolls=[]; let r; for(let t=0;t<3;t++){ r=1+rnd(P.die); rolls.push(r); if(r!==1) break; }
+  c.hpMax=Math.max(1,r+m.hp+5); c.hp=c.hpMax; c.hpRolls=rolls;
+  const mr=[dice(1,6),dice(1,6),dice(1,6)]; c.money=(mr[0]+mr[1]+mr[2])*10; c.moneyRolls=mr;
+  if(gear) genGear(c); else { c.inv=[]; c.cart=[]; c.spent=0; }
+  const fixed=langFixed(c), opts=LANGS.filter(x=>!fixed.includes(x)).sort(()=>rnd(3)-1); c.langSel=opts.slice(0,Math.min(m.langs,opts.length)); c.langs="";
+  genSpells(c);
+  c.notes=[c.notes,"נוצרה במגריל הדמויות."].filter(Boolean).join("\n");
+  return c;
+}
+let GEN=null;
+function genOpen(){
+  if(frozen()){ toast("הדמויות נעולות בזמן הרפתקה"); return; }
+  GEN={cls:"",method:"house",sex:"",gear:true,c:null};
+  $("genBody").innerHTML=`<div class="gen-f">
+    <label>סוג דמות<select id="genCls"><option value="">אקראי</option>${CLASS_GROUPS.map(([g,ids])=>`<optgroup label="${esc(g)}">${ids.map(id=>`<option value="${id}">${esc(CLASSES[id].name)}</option>`).join("")}</optgroup>`).join("")}</select></label>
+    <label>גלגול תכונות<select id="genM">${Object.entries(ROLL_M).map(([k,m])=>`<option value="${k}" ${k==="house"?"selected":""}>${esc(m.n+": "+m.t)}</option>`).join("")}</select></label>
+    <label>מין<select id="genSex"><option value="">אקראי</option><option value="m">זכר</option><option value="f">נקבה</option></select></label>
+    <label class="gen-ck"><input type="checkbox" id="genGear" checked> לקנות ציוד</label></div>
+    <div class="gm-row"><button class="btn primary" id="genGo">🎲 הגרלה</button></div><div id="genOut"></div>`;
+  $("genGo").onclick=genRun; $("genSave").disabled=true;
+  $("genScrim").hidden=false; $("genTitle").focus();
+}
+function genRun(){
+  const cls=$("genCls").value||pick(Object.keys(CLASSES));
+  GEN.c=genChar(cls,$("genM").value,$("genSex").value,$("genGear").checked);
+  const c=GEN.c, m=mods(c), P=PROG[c.cls], ab=ABIL.map(([k,l])=>`<span class="${P.prime.includes(k)?"rl-pr":""}">${P.prime.includes(k)?"★ ":""}${l} <b>${c[k]}</b></span>`).join("");
+  const al={order:"סדר",neutral:"ניטרלי",chaos:"תוהו"}[c.align];
+  const items=c.inv.map(l=>`${esc(l.name)}${l.qty>1?` ×${l.qty}`:""}`).join(", ");
+  const sp=(c.book||[]).map(id=>WSP_BY[id]&&WSP_BY[id][2]).filter(Boolean);
+  $("genOut").innerHTML=`<div class="gen-card">
+    <h4>${esc(c.name)}</h4>
+    <p class="small">${esc(cname(c))} · ${c.sex==="f"?"נקבה":"זכר"} · גיל ${esc(c.age)} · ${al}</p>
+    <div class="gen-ab">${ab}</div>
+    <p class="small">נק״פ <b>${c.hpMax}</b> <span class="muted">(גלגול ק${P.die}: <bdi dir="ltr">${c.hpRolls.join(" → ")}</bdi>, חוסן <bdi dir="ltr">${sgn(m.hp)}</bdi>, ועוד 5)</span> · כסף התחלתי <b>${c.money}</b> מ״ז <span class="muted">(3ק6: <bdi dir="ltr">${c.moneyRolls.join("+")}</bdi>, כפול 10)</span></p>
+    ${c.inv.length?`<p class="small"><b>ציוד</b> (${fmtGp(c.spent)} מ״ז, נשארו ${coins(purse(c))}, משקל ${kgTxt(invTotals(c).wt)} מתוך ${limitOf(c)} ק״ג): ${items}</p>`:`<p class="small">בלי ציוד. ${coins(purse(c))} בארנק.</p>`}
+    <p class="small"><b>שפות:</b> ${esc(langAll(c).join(", "))}</p>
+    ${sp.length?`<p class="small"><b>${P.tattoos?"קעקועי לחשים":"ספר הלחשים"}:</b> ${esc(sp.join(", "))}</p>`:""}
+  </div>`;
+  $("genGo").textContent="🎲 הגרלה מחדש"; $("genSave").disabled=false;
+}
+function genSave(){
+  if(!GEN||!GEN.c||frozen()) return;
+  const c=GEN.c; delete c.hpRolls; delete c.moneyRolls;
+  state.chars.push(c); state.current=c.id; schedule(); genClose(); renderAll(); toast(`${c.name} ${G(c,"נוסף","נוספה")} לחבורה`);
+}
+function genClose(){ $("genScrim").hidden=true; GEN=null; }
+function genBind(){
+  $("genSave").onclick=genSave; $("genCancel").onclick=genClose;
+  $("genScrim").addEventListener("click",e=>{ if(e.target.id==="genScrim") genClose(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("genScrim").hidden) genClose(); });
+}
+
 /* ---------- actions ---------- */
 function addItem(item,qty){
   const c=cur(); qty=qty||1;
@@ -1888,6 +2042,7 @@ function renderTabs(){
   add.onclick=()=>{ if(frozen()) return; const c=newChar("דמות "+(state.chars.length+1));state.chars.push(c);state.current=c.id;schedule();renderAll();$("charName").focus();$("charName").select();
     requestAnimationFrame(()=>{box.scrollLeft=box.scrollWidth*-1;});};
   box.appendChild(add);
+  const gb=document.createElement("button"); gb.className="ctab add"; gb.textContent="🎲 דמות אקראית"; gb.title="מגריל דמויות: דמות שלמה בדרגה 1"; gb.onclick=genOpen; box.appendChild(gb);
   const sel=box.querySelector("[aria-selected=true]"); if(sel) sel.scrollIntoView({block:"nearest",inline:"nearest"});
   const ms=$("mbChar"); ms.innerHTML=""; for(const c of state.chars) ms.appendChild(Object.assign(document.createElement("option"),{value:c.id,textContent:c.name||"בלי שם"}));
   ms.value=cur().id; ms.onchange=()=>{state.current=ms.value;schedule();renderAll();};
@@ -2693,7 +2848,7 @@ const maxLevel=cls=>PROG[cls]?PROG[cls].xp.length:1;
 const lvlOf=c=>Math.max(1,Math.min(maxLevel(c.cls),Number(c.level)||1));
 
 function sheetInit(){
-  rollBind();
+  rollBind(); genBind();
   const ab=$("shAbil"); ab.innerHTML="";
   for(const [k,label] of ABIL){
     const d=document.createElement("div"); d.className="abt";
