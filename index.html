@@ -251,6 +251,9 @@ input[type=number],input[type=text],input[type=search],select,textarea{backgroun
 .st-bar{height:10px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden}.st-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
 .st-n{font-variant-numeric:tabular-nums;text-align:start}
 .app.player #gmStats,.app.player #gmDms,.app.player #gmLib{display:none}
+.lib-prev{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px;background:var(--panel)}
+.lib-prev h4{margin:0 0 6px}.lib-pc{padding:6px 0;border-top:1px dashed var(--line)}.lib-pc:first-of-type{border-top:0}
+.lib-er{color:#a3271d;margin:4px 0;padding-inline-start:18px;font-size:.85rem}.lib-wn{margin:4px 0;padding-inline-start:18px;font-size:.85rem;color:#6b5a2e}
 .btn.mode{font-weight:600}.app.dm .btn.mode{border-color:var(--accent);color:var(--accent)}
 .frozen-note{margin:0;padding:8px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);font-size:.9rem}
 .frozen-note[hidden]{display:none}
@@ -4660,12 +4663,100 @@ async function libSyncReaders(){
     }catch(e){ console.warn("book sharing",e); LIB_SYNC=""; }
   }
 }
-async function libUpload(file){
-  const ev=$("libEvery"), every=!!(ev&&ev.checked), say=t=>{ LIB_BUSY=t; libPaint(); };
-  try{ say("קורא את הקובץ…"); const o=JSON.parse(await file.text()); const list=Array.isArray(o.books)?o.books:[o];
-    const done=[]; for(const e of list) done.push(await libPut(e,every,say));
-    LIB_BUSY=""; QINDEX=null; await libLoad(); toast(done.length===1?`ההרפתקה "${done[0]}" נשמרה בספרייה`:`${done.length} הרפתקאות נשמרו בספרייה`); }
-  catch(e){ console.warn(e); LIB_BUSY=""; LIB_ERR=(e&&e.message&&/[\u0590-\u05FF]/.test(e.message))?e.message:"ההעלאה נכשלה. בדקו את הקובץ ואת החיבור ונסו שוב"; libPaint(); LIB_ERR=""; }
+/* ---- importing: one packaged file, or a book file and its pictures picked together; everything is checked and shown before saving ---- */
+let LIB_PREV=null;
+const IMG_RE=/\.(jpe?g|png|webp|gif)$/i;
+const baseName=p=>String(p).split(/[\\/]/).pop().toLowerCase();
+const fileURL=f=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); });
+function imgRefs(o){ const out=new Set(); JSON.stringify(o,(k,v)=>{ if(typeof v==="string"&&v.length<300&&!/\s/.test(v)&&IMG_RE.test(v)) out.add(v); return v; }); return [...out]; }
+async function libPick(files){
+  const say=t=>{ LIB_BUSY=t; libPaint(); }; LIB_PREV=null; LIB_ERR="";
+  try{
+    say("קורא את הקבצים…"); const jsons=[], loose={};
+    for(const f of files){ if(IMG_RE.test(f.name)||/^image\//.test(f.type)) loose[baseName(f.name)]=await fileURL(f); else jsons.push(f); }
+    if(!jsons.length) throw new Error("צריך לבחור גם את קובץ ההרפתקה (json), לא רק תמונות.");
+    const entries=[];
+    for(const f of jsons){ let o; try{ o=JSON.parse(await f.text()); }catch(e){ throw new Error(`הקובץ "${f.name}" אינו קובץ JSON תקין.`); }
+      if(Array.isArray(o&&o.books)) for(const e of o.books) entries.push({file:f.name,book:e&&e.book,images:Object.assign({},(e&&e.images)||{})});
+      else if(o&&o.book&&o.book.rooms) entries.push({file:f.name,book:o.book,images:Object.assign({},o.images||{})});
+      else entries.push({file:f.name,book:o,images:{}}); }
+    const used=new Set();
+    for(const e of entries){ for(const ref of imgRefs(e.book)){ if(e.images[ref]) continue; const d=loose[baseName(ref)]; if(d){ e.images[ref]=d; used.add(baseName(ref)); } } }
+    for(const e of entries){ e.report=await libCheck(e); }
+    const extra=Object.keys(loose).filter(n=>!used.has(n));
+    if(extra.length&&entries[0]) entries[0].report.warns.push(`תמונות שבחרת ושהספר לא משתמש בהן (לא יישמרו): ${extra.join(", ")}`);
+    LIB_PREV=entries; LIB_BUSY=""; libPaint();
+  }catch(e){ console.warn(e); LIB_BUSY=""; LIB_ERR=(e&&e.message&&/[֐-׿]/.test(e.message))?e.message:"קריאת הקבצים נכשלה."; libPaint(); }
+}
+/* what the app needs from a book file; errors stop the import, warnings only explain what will be missing */
+async function libCheck(e){
+  const b=e.book, er=[], wn=[], st={};
+  if(!b||typeof b!=="object"||Array.isArray(b)) return {errs:["בקובץ אין ספר הרפתקה."],warns:[],st};
+  const id=String(b.id||"").trim();
+  if(!id) er.push("לספר אין מזהה (id)."); else if(!/^[a-z0-9][a-z0-9-]{1,40}$/.test(id)) er.push(`המזהה "${id}" לא תקין: אותיות אנגליות קטנות, ספרות ומקפים בלבד, 2–41 תווים.`);
+  if(!b.title) er.push("לספר אין שם (title).");
+  const rooms=Array.isArray(b.rooms)?b.rooms:null; if(!rooms||!rooms.length) er.push("אין בספר חדרים (rooms).");
+  const R=new Set(), F=new Set((b.flags||[]).map(f=>f&&f.id).filter(Boolean));
+  (rooms||[]).forEach((r,i)=>{ const rid=r&&r.id!=null?String(r.id):""; if(!rid){ er.push(`לחדר מספר ${i+1} ברשימה אין מזהה (id).`); return; }
+    if(R.has(rid)) er.push(`המזהה של חדר ${rid} מופיע פעמיים.`); R.add(rid); if(!r.name) wn.push(`לחדר ${rid} אין שם.`); });
+  let mons=0, tre=0, trp=0, ev=0;
+  for(const r of rooms||[]){ const rid=String(r.id);
+    for(const m of r.monsters||[]){ mons+=Number(m.count)||1; if(!m.name) er.push(`בחדר ${rid} יש מפלצת בלי שם.`); else if(m.ac==null||isNaN(Number(m.ac))) wn.push(`ל"${m.name}" בחדר ${rid} אין דרג״ש מספרי.`); }
+    for(const t of r.treasure||[]){ tre++; if(t.gp!=null&&isNaN(Number(t.gp))) wn.push(`באוצר "${t.name}" בחדר ${rid} הערך בזהב לא מספרי.`); }
+    for(const t of r.traps||[]){ trp++; if(t.dmg&&!rollExpr(t.dmg)) wn.push(`נזק המלכודת "${t.name}" בחדר ${rid} לא נקרא כגלגול קוביות (${t.dmg}).`); }
+    for(const x of r.events||[]){ ev++; if(x.fight&&!R.has(String(x.fight.from))) wn.push(`אירוע בחדר ${rid} מפנה לקרב בחדר ${x.fight.from}, שלא קיים.`); if(x.flag&&!F.has(x.flag)) wn.push(`אירוע בחדר ${rid} מסמן "${x.flag}", שלא מוגדר באירועים של הספר (flags).`); }
+    for(const k of Object.keys(r.flagNotes||{})) if(!F.has(k)) wn.push(`בחדר ${rid} יש הערה לאירוע "${k}", שלא מוגדר באירועים של הספר.`);
+    for(const a of r.adjust||[]) if(a.op!=="noevent"&&!(r.monsters||[]).some(m=>m.name===a.mon)) wn.push(`התאמה בחדר ${rid} מתייחסת ל"${a.mon}", שאין בחדר.`); }
+  for(const g of b.goals||[]) if(!g.id||!g.name||isNaN(Number(g.xp))) wn.push(`מטרה "${g.name||g.id||"?"}" חסרה מזהה, שם או נק״ן מספרי.`);
+  const has=p=>!!(p&&e.images[p]);
+  const M=b.map;
+  if(!M) wn.push("אין בספר מפה.");
+  else{
+    if(!M.file) wn.push("אין בספר מפה למנחה.");
+    else if(!has(M.file)) wn.push(`תמונת מפת המנחה (${baseName(M.file)}) לא נמצאה, ולכן הספר יישמר בלי מפה למנחה.`);
+    const pins=Object.keys(M.pins||{}); st.pins=pins.length; const bad=pins.filter(k=>!R.has(k)); if(bad.length) wn.push(`סיכות במפה לחדרים שלא קיימים: ${bad.join(", ")}.`);
+    const P=M.players;
+    if(!P) wn.push("אין מפה לשחקנים: השחקנים לא יראו מפת מבוך בהרפתקה הזו.");
+    else{ if(!has(P.file)) wn.push(`תמונת מפת השחקנים (${baseName(P.file||"")}) לא נמצאה, ולכן לשחקנים לא תהיה מפה.`);
+      const rg=Object.keys(P.regions||{}); st.regions=rg.length; const bad2=rg.filter(k=>!R.has(k)); if(bad2.length) wn.push(`אזורים במפת השחקנים לחדרים שלא קיימים: ${bad2.join(", ")}.`);
+      const noReg=[...R].filter(k=>!(P.regions||{})[k]); if(noReg.length&&rg.length) wn.push(`חדרים שלא יופיעו במפת השחקנים (אין להם אזור): ${noReg.join(", ")}.`);
+      for(const x of P.patches||[]) if(!has(x.file)) wn.push(`תמונת התוספת לחדר ${x.room} (${baseName(x.file||"")}) לא נמצאה.`); } }
+  const refs=imgRefs(b), miss=refs.filter(p=>!has(p)&&!(M&&(p===M.file||(M.players&&(p===M.players.file||(M.players.patches||[]).some(x=>x.file===p))))));
+  if(miss.length) wn.push(`תמונות נוספות שהספר מפנה אליהן ולא נמצאו: ${miss.map(baseName).join(", ")}.`);
+  const big=Object.values(e.images).filter(d=>String(d).length>=900000).length; if(big) wn.push(big===1?"תמונה אחת גדולה מהמותר ותוקטן בשמירה.":`${big} תמונות גדולות מהמותר ויוקטנו בשמירה.`);
+  Object.assign(st,{rooms:R.size,mons,tre,trp,ev,goals:(b.goals||[]).length,imgs:refs.filter(has).length});
+  if(!er.length&&LIB_ON()&&id){ try{ const sn=await dbRef.doc("books/"+id).get(); if(sn.exists){ const o=sn.data();
+      if(o.owner!==EXT.uid()&&!EXT.isAdmin()) er.push(`כבר יש בספרייה הרפתקה עם המזהה ${id} ("${o.title}") של מנחה אחר.`);
+      else { st.replace=o.title||id; wn.unshift(`יחליף את ההרפתקה "${o.title||id}" שכבר בספרייה. ההתקדמות במשחקים נשמרת לפי מספרי החדרים.`); } } }catch(x){} }
+  return {errs:er,warns:wn,st};
+}
+/* what is saved: references to pictures that were not found are dropped, so nothing points at a missing file */
+function libClean(e){
+  const b=JSON.parse(JSON.stringify(e.book)), has=p=>!!(p&&e.images[p]), M=b.map;
+  if(M){ if(M.file&&!has(M.file)){ delete M.file; delete M.pins; }
+    if(M.players){ if(!has(M.players.file)) delete M.players; else if(M.players.patches) M.players.patches=M.players.patches.filter(x=>has(x.file)); }
+    if(!M.file&&!M.players) delete b.map; }
+  const out=JSON.parse(JSON.stringify(b),(k,v)=>typeof v==="string"&&v.length<300&&!/\s/.test(v)&&IMG_RE.test(v)&&!has(v)?"":v);
+  const imgs={}; for(const p of imgRefs(out)) imgs[p]=e.images[p]; return {book:out,images:imgs};
+}
+async function libSave(){
+  const ev=$("libEvery"), every=!!(ev&&ev.checked), say=t=>{ LIB_BUSY=t; libPaint(); }, list=(LIB_PREV||[]).filter(e=>!e.report.errs.length);
+  if(!list.length) return;
+  try{ const done=[]; for(const e of list) done.push(await libPut(libClean(e),every,say));
+    LIB_PREV=null; LIB_BUSY=""; QINDEX=null; await libLoad(); toast(done.length===1?`ההרפתקה "${done[0]}" נשמרה בספרייה`:`${done.length} הרפתקאות נשמרו בספרייה`); }
+  catch(e){ console.warn(e); LIB_BUSY=""; LIB_ERR=(e&&e.message&&/[֐-׿]/.test(e.message))?e.message:"השמירה נכשלה. בדקו את החיבור ונסו שוב"; libPaint(); }
+}
+function libPrevHTML(){
+  if(!LIB_PREV) return "";
+  const ok=LIB_PREV.filter(e=>!e.report.errs.length).length;
+  return `<div class="lib-prev"><h4>בדיקה לפני שמירה</h4>${LIB_PREV.map(e=>{ const b=e.book||{}, R=e.report, S=R.st;
+    return `<div class="lib-pc${R.errs.length?" bad":""}"><b>${esc(b.title||"בלי שם")}</b> <span class="muted small"><bdi>${esc(b.id||"?")}</bdi> · ${esc(e.file)}</span>
+      ${b.source||b.levels?`<div class="muted small">${esc([b.source,b.levels].filter(Boolean).join(" · "))}</div>`:""}
+      ${S.rooms?`<div class="small">${S.rooms} חדרים · ${S.mons} מפלצות · ${S.tre} פריטי אוצר · ${S.trp} מלכודות · ${S.ev} אירועים · ${S.goals} מטרות · ${S.imgs} תמונות${S.pins?` · ${S.pins} סיכות במפה`:""}${S.regions?` · ${S.regions} אזורים במפת השחקנים`:""}</div>`:""}
+      ${R.errs.length?`<ul class="lib-er">${R.errs.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+      ${R.warns.length?`<ul class="lib-wn">${R.warns.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+      ${!R.errs.length&&!R.warns.length?`<p class="small">הכול תקין.</p>`:""}</div>`; }).join("")}
+    <div class="gm-row"><button class="btn small primary" id="libSave" ${ok&&!LIB_BUSY?"":"disabled"}>${ok===LIB_PREV.length?(ok===1?"שמירה בספרייה":`שמירת ${ok} ההרפתקאות בספרייה`):ok===1?"שמירת ההרפתקה התקינה":ok?`שמירת ${ok} ההרפתקאות התקינות`:"אין מה לשמור"}</button><button class="btn small" id="libCancel">ביטול</button></div></div>`;
 }
 async function libLoad(){ if(!LIB_ON()||!gGoogle()) return; LIB="loading"; libPaint();
   try{ LIB=await libQuery(); LIB_ERR=""; }catch(e){ console.warn(e); LIB="error"; } libPaint(); }
@@ -4692,11 +4783,12 @@ function libPaint(){
       ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":mine?"רק שלך":"פתוחה לך דרך משחק שלך"}</div>`}
       ${!b.everyone&&(b.readers||[]).length&&(mine||admin)?`<div class="muted small">פתוחה גם למנחים במשחקים שמשתמשים בה: ${(b.readers||[]).map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""}</div>
       ${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</li>`; }).join("")}</ul>`;
-  h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json" hidden ${LIB_BUSY?"disabled":""}>
+  h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json,image/*" multiple hidden ${LIB_BUSY?"disabled":""}>
     ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>
-    <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"קובץ הרפתקה שהוכן לאפליקציה (json). הרפתקה עם אותו מזהה מתעדכנת."}</p>`;
+    <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"בוחרים קובץ הרפתקה מוכן (json), או את קובץ הספר יחד עם תמונות המפות שלו. לפני השמירה מוצגת בדיקה. הרפתקה עם אותו מזהה מתעדכנת."}</p>${libPrevHTML()}`;
   box.innerHTML=h;
-  const f=$("libFile"); if(f) f.onchange=()=>{ const x=f.files&&f.files[0]; if(x) libUpload(x); f.value=""; };
+  const f=$("libFile"); if(f) f.onchange=()=>{ const x=f.files&&[...f.files]; if(x&&x.length) libPick(x); f.value=""; };
+  const sv=$("libSave"); if(sv) sv.onclick=libSave; const cn=$("libCancel"); if(cn) cn.onclick=()=>{ LIB_PREV=null; LIB_ERR=""; libPaint(); };
   box.querySelectorAll("[data-lib-del]").forEach(b=>b.onclick=()=>libDelete(b.dataset.libDel,b.dataset.t));
   box.querySelectorAll("[data-lib-every]").forEach(b=>b.onchange=()=>libEvery(b.dataset.libEvery,b.checked));
 }
@@ -4750,7 +4842,7 @@ function qTop(b){
   }
   if(b&&(b.flags||[]).length) h+=`<div class="q-goals"><span class="muted small">אירועים:</span>${b.flags.map(f=>`<button class="chip q-flag" data-q="flag" data-id="${esc(f.id)}" aria-pressed="${!!s.flags[f.id]}" title="${esc(f.page||"")}">${s.flags[f.id]?"⚑ ":""}${esc(f.name)}</button>`).join("")}</div>`;
   if(b) h+=`<div class="q-time"><span class="num small">${clockTxt()}</span>${lightChip()}<button class="btn small" data-q="time" data-n="600" title="תור = 10 דקות (מ 35)">+ 10 ד׳</button></div>`;
-  return h+`${b&&b.map?`<button class="btn small" data-q="map" aria-pressed="${QMAP}">🗺 ${QMAP?"סגירת המפה":"מפה"}</button>`:""}<a class="btn small" href="#adv">למעקב ההרפתקה ←</a></div>`;
+  return h+`${b&&b.map&&b.map.file?`<button class="btn small" data-q="map" aria-pressed="${QMAP}">🗺 ${QMAP?"סגירת המפה":"מפה"}</button>`:""}<a class="btn small" href="#adv">למעקב ההרפתקה ←</a></div>`;
 }
 function qList(b){
   const s=qs(b.id);
@@ -4835,7 +4927,7 @@ function renderMbBook(b){
   if(!b){el.innerHTML=`<b class="mb-an">ספר ההרפתקה</b><span class="mb-st">לא נבחרה הרפתקה</span>`;return;}
   const s=qs(b.id), rooms=b.rooms||[], seen=rooms.filter(r=>roomSt(b.id,r.id).st).length, clear=rooms.filter(r=>roomSt(b.id,r.id).st==="clear").length;
   const left=rooms.reduce((a,r)=>a+qMonLeft(b,r),0), goals=(b.goals||[]), done=goals.filter(g=>s.goals[g.id]).length, room=rooms.find(r=>r.id===s.cur);
-  el.innerHTML=`<b class="mb-an">${esc(b.title)}</b>${b.map?`<button class="btn small" data-mbq="map" aria-pressed="${QMAP}">🗺 ${QMAP?"סגירת המפה":"מפה"}</button>`:""}
+  el.innerHTML=`<b class="mb-an">${esc(b.title)}</b>${b.map&&b.map.file?`<button class="btn small" data-mbq="map" aria-pressed="${QMAP}">🗺 ${QMAP?"סגירת המפה":"מפה"}</button>`:""}
     ${room?`<span class="tag mine">חדר ${esc(room.id)}: ${esc(room.name)}</span>`:""}
     <span class="mb-at num">${clockTxt()}</span><button class="btn small" data-mbq="time">+ 10 ד׳</button>${lightChip()}
     <span class="mb-st num">ביקרו ${seen}/${rooms.length} · נוקו ${clear} · ⚔ ${left} מפלצות נותרו${goals.length?` · מטרות ${done}/${goals.length}`:""} · קופת נק״ן ${(Number(adv().xpPool)||0).toLocaleString("he-IL")}</span>`;
@@ -4854,7 +4946,7 @@ function renderQuest(){
   if(!b){ root.innerHTML=qTop(null)+(QERR?`<p class="dn">${esc(QERR)}</p>`:`<p class="muted q-empty">בחרו הרפתקה מהרשימה. כל הרפתקה שומרת בנפרד את מצב החדרים, המפלצות, האוצר והמטרות.</p>`); return; }
   const s=qs(b.id), room=(b.rooms||[]).find(r=>r.id===s.cur);
   const scroll=$("qDetail")?$("qDetail").scrollTop:0, sameRoom=root.dataset.cur===String(s.cur)+(QMAP?"m":"");
-  root.innerHTML=qTop(b)+`<div class="q-body">${qList(b)}<div id="qDetail" class="q-detail">${QMAP&&b.map?qMap(b):room?qRoom(b,room):qIntro(b)}</div></div>`;
+  root.innerHTML=qTop(b)+`<div class="q-body">${qList(b)}<div id="qDetail" class="q-detail">${QMAP&&b.map&&b.map.file?qMap(b):room?qRoom(b,room):qIntro(b)}</div></div>`;
   root.dataset.cur=String(s.cur)+(QMAP?"m":"");
   if(sameRoom) $("qDetail").scrollTop=scroll;
 }
