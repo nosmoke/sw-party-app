@@ -21,12 +21,7 @@
 ./tools/build.sh
 ```
 
-הסקריפט בונה שתי גרסאות מאותו קוד:
-
-- `index.html` — האתר החיצוני (GitHub Pages + Firebase).
-- `dist-claude/index.html` — הגרסה שמתפרסמת כ־artifact ב־Claude, עם השמירה של Claude. התיקייה לא נשמרת במאגר.
-
-שתי הגרסאות משתמשות באותם קבצים שליד `index.html`.
+הסקריפט בונה את האתר (`index.html`, ל־GitHub Pages + Firebase) מתוך `src/app.html`, יחד עם הקבצים שלידו.
 
 ## גרסאות
 

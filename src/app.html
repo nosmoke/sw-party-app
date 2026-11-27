@@ -211,9 +211,7 @@ input[type=number],input[type=text],input[type=search],select,textarea{backgroun
 .copybox{margin-top:10px}
 /* player / DM modes */
 .app.player .dm-only{display:none!important}
-.app.player #mbBook,.app.player:not(.ext) #backupBtn,.app.player:not(.ext) #backupPanel,.app.player #bkSec,.app.player .gm-dm{display:none!important}
-.app:not(.ext) #gmSec{display:none}
-body.ext .not-ext{display:none}
+.app.player #mbBook,.app.player #bkSec,.app.player .gm-dm{display:none!important}
 .backup .set-h{margin:0 0 4px;font-size:1.05rem}
 .backup .set-sec{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
 .backup .set-sec:first-of-type{border-top:0;margin-top:4px;padding-top:0}
@@ -756,7 +754,6 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
         <button class="btn small" id="bkLoad">שחזור מקובץ</button>
         <button class="btn small" id="bkCopy">העתקה כטקסט</button>
         <button class="btn small" id="bkPaste">שחזור מטקסט</button>
-        <button class="btn small not-ext" id="bkReset">איפוס הכול</button>
         <input type="file" id="bkFile" accept=".json,application/json,text/plain" hidden>
       </div>
     </div>
@@ -1002,7 +999,6 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="prTitle">
     <h3 id="prTitle">הדפסת דף הדמות</h3>
     <div id="prBody"></div>
-    <p class="muted small not-ext">בתוך Claude הדפדפן לא מאפשר לפתוח הדפסה ישירות. לכן הדף נשמר כקובץ: פותחים אותו, והוא נשלח להדפסה מעצמו.</p>
     <div class="acts"><button class="btn primary" id="prDl">שמירה והדפסה</button><button class="btn" id="prCancel">ביטול</button></div>
   </div>
 </div>
@@ -1363,16 +1359,16 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",langSel:[],notes:"",bg:"",player:"",age:"",sex:"",locked:false,hspec:""};
 function newChar(name){return Object.assign({id:uid(),name:name||"דמות חדשה",cls:"",money:100,str:10,limit:null,cart:[],inv:[],spent:0,gain:0},SHEET_DEF,{book:[]});}
 let state={current:null,chars:[]};
-let saveTimer=null, store=null, dirty=false, writing=false, lastSaved=null, unsub=null, dbRef=null, uidRef=null;
-/* portraits are kept in their own documents (data/users/<id>/p_<character id>), not inside the party document,
+let saveTimer=null, store=null, dirty=false, writing=false, lastSaved=null, unsub=null, dbRef=null;
+/* portraits are kept in their own documents (games/<code>/por/<character id>), not inside the party document,
    so the party document stays small: one document has a size limit, and a few pictures went over it */
 const PR_SYNCED={};   /* character id -> portrait version that the account already holds */
-/* the hosted version (outside Claude) keeps each game in games/<code>, with its pictures in games/<code>/por/<character id>;
-   when the device has joined no game there, everything stays on this device only */
+/* each game is kept in games/<code>, with its pictures in games/<code>/por/<character id>;
+   when the device has joined no game, everything stays on this device only */
 const EXT=window.SW_EXT||null;
 let GAME=null; if(EXT){ try{ GAME=localStorage.getItem("sw-game")||null; }catch(e){} }
 const LSKEY=()=>GAME?"sw-game-"+GAME:"sw-shop-v1";
-const porDoc=cid=>EXT?dbRef.doc("games/"+GAME+"/por/"+cid):dbRef.doc("data/users/"+uidRef+"/p_"+cid);
+const porDoc=cid=>dbRef.doc("games/"+GAME+"/por/"+cid);
 const stripPor=st=>JSON.stringify(st,(k,v)=>k==="portrait"?undefined:v);
 /* bring in the portraits of a state that came from the account: keep what this device already has, fetch the rest */
 async function pullPortraits(prev){
@@ -1517,13 +1513,12 @@ async function flush(){
     /* pictures first, each in its own document; then the party without them */
     if(dbRef){ for(const c of state.chars){ if(c.portrait&&c.porV&&PR_SYNCED[c.id]!==c.porV){ await porDoc(c.id).set({img:c.portrait,v:c.porV,savedAt:at}); PR_SYNCED[c.id]=c.porV; } }
       for(const cid of Object.keys(PR_SYNCED)){ const c=state.chars.find(x=>x.id===cid); if(!c||!c.portrait){ try{ await porDoc(cid).delete(); }catch(e){} delete PR_SYNCED[cid]; } } }
-    if(EXT){
+    {
       if(secStore&&SEC_READY&&gIsDM()){ const x=secOf(state), sj=JSON.stringify(x); if(sj!==SEC_LAST){ secSaved=at; await secStore.set({json:sj,savedAt:at}); SEC_LAST=sj; } }
       const up={pj:stripPor(pubOf(state)),savedAt:at}; if(NEED_PJ&&SEC_READY&&gIsDM()) up.json="";   /* the old all-in-one copy goes once the DM part is saved */
       await store.update(up); if(up.json==="") NEED_PJ=false; if(SEC_READY&&gIsDM()) libSyncReaders();
-      setSave("נשמר במשחק, זמין לכל המחוברים אליו"); }
-    else { await store.set({json:stripPor(state),savedAt:at}); setSave("נשמר בחשבון שלך, זמין מכל מכשיר"); } }
-  catch(e){setSave(EXT?"השמירה למשחק נכשלה, נשמר במכשיר הזה":"השמירה לחשבון נכשלה, נשמר במכשיר הזה");}
+      setSave("נשמר במשחק, זמין לכל המחוברים אליו"); } }
+  catch(e){setSave("השמירה למשחק נכשלה, נשמר במכשיר הזה");}
   writing=false;
 }
 function setSave(t){$("saveState").textContent=t;}
@@ -1531,12 +1526,12 @@ async function connect(){
   try{
     if(!window.claude||!window.claude.use){setSave("נשמר במכשיר הזה בלבד");return;}
     const [db,user]=await Promise.all([window.claude.use("db"),window.claude.use("user")]);
-    if(!db||!user){setSave("נשמר במכשיר הזה בלבד. התחברו ל־Claude כדי לשמור בין מכשירים");return;}
+    if(!db||!user){setSave("אין חיבור לשרת כרגע: נשמר במכשיר הזה בלבד");return;}
     const id=await user.id(); if(!id){setSave("נשמר במכשיר הזה בלבד");return;}
-    dbRef=db; uidRef=id;
+    dbRef=db;
     if(EXT){ logVisit(); dmTouch(); }
     if(EXT&&!GAME){ setSave("לא מחובר למשחק: נשמר במכשיר הזה בלבד"); renderGame(); return; }
-    const want=GAME; store=EXT?db.doc("games/"+GAME):db.doc("data/users/"+id+"/shop");
+    const want=GAME; store=db.doc("games/"+GAME);
     const timer=setTimeout(()=>setSave("החשבון לא עונה כרגע; העבודה נשמרת במכשיר הזה"),10000);
     const snap=await store.get(); clearTimeout(timer);
     if(EXT&&want!==GAME) return;   /* the device switched games while this one was loading */
@@ -1545,7 +1540,7 @@ async function connect(){
       let remote=null; if(EXT) remote=gDocState(snap.data()); else try{remote=JSON.parse(snap.data().json);}catch(e){}
       if(valid(remote)&&!dirty){const prev=state; state=normalize(remote);saveLocal();renderAll(); await pullPortraits(prev);}
       if(EXT){ GMETA=gmMeta(snap.data()); renderModeBtn(); secEnsure(); }
-      setSave(EXT?"מחובר למשחק: השינויים נשמרים לכל המחוברים":"נשמר בחשבון שלך, זמין מכל מכשיר");
+      setSave("מחובר למשחק: השינויים נשמרים לכל המחוברים");
     }else await flush();
     renderGame();
     /* live: when the same account saves from another device (the DM's screen), apply it here */
@@ -1562,7 +1557,7 @@ async function connect(){
   }catch(e){store=null;setSave("נשמר במכשיר הזה בלבד");}
 }
 
-/* ---------- games (hosted version only): create, join, leave, reset; the manager lists and deletes games ---------- */
+/* ---------- games: create, join, leave, reset; the manager lists and deletes games ---------- */
 let GMETA=null, GLIST=null, GBUSY=false;
 const fmtCode=c=>String(c||"").replace(/^(\d{5})(\d{5})$/,"$1 $2");
 const isoCode=c=>"\u2066"+fmtCode(c)+"\u2069";   /* keeps the two halves in order inside Hebrew text */
@@ -1617,10 +1612,10 @@ function gmReset(){
     state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); toast("המשחק אופס");
   });
 }
-/* reset everything outside a hosted game: this device's party, or (inside Claude) the account's party */
+/* reset everything outside a game: this device's party */
 function resetAll(){
   if(MODE!=="dm") return;
-  ask("לאפס את כל הנתונים?",`כל ${state.chars.length} הדמויות (${state.chars.map(c=>c.name).join(", ")}), האיורים, מעקב ההרפתקה, ספר ההרפתקה וסיסמת המנחה (תחזור ל־${PW_DEFAULT}) יימחקו ${EXT?"מהמכשיר הזה":"מהחשבון ומכל המכשירים שלו"}. כדאי לשמור גיבוי לפני כן.`,"איפוס הכול",()=>{
+  ask("לאפס את כל הנתונים?",`כל ${state.chars.length} הדמויות (${state.chars.map(c=>c.name).join(", ")}), האיורים, מעקב ההרפתקה, ספר ההרפתקה וסיסמת המנחה (תחזור ל־${PW_DEFAULT}) יימחקו מהמכשיר הזה. כדאי לשמור גיבוי לפני כן.`,"איפוס הכול",()=>{
     state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); bkSummary(); toast("הכול אופס. סיסמת המנחה חזרה ל־"+PW_DEFAULT);
   });
 }
@@ -1753,7 +1748,7 @@ let SET_TAB="";
 function renderSetTabs(){
   const bar=$("setTabs"); if(!bar) return;
   const dm=MODE==="dm", admin=!!(EXT&&EXT.isAdmin&&EXT.isAdmin()&&gGoogle());
-  const tabs=EXT?[["game","משחק"],["acct","חשבון מנחה"],["hf","איורים"],...(dm?[["lib","ספרייה"]]:[]),...(admin&&dm?[["stats","כניסות"],["dms","מנחים"]]:[]),...(dm?[["backup","גיבוי"]]:[])]:[["backup","גיבוי"]];
+  const tabs=[["game","משחק"],["acct","חשבון מנחה"],["hf","איורים"],...(dm?[["lib","ספרייה"]]:[]),...(admin&&dm?[["stats","כניסות"],["dms","מנחים"]]:[]),...(dm?[["backup","גיבוי"]]:[])];
   if(!tabs.some(t=>t[0]===SET_TAB)) SET_TAB=tabs[0][0];
   bar.hidden=tabs.length<2;
   bar.innerHTML=tabs.map(([k,l])=>`<button type="button" role="tab" data-st="${k}" aria-selected="${k===SET_TAB}">${l}</button>`).join("");
@@ -1812,7 +1807,7 @@ function dmsPaint(){
   box.innerHTML=h; const r=$("dmsRefresh"); if(r) r.onclick=dmsLoad;
 }
 
-/* ---------- anonymous visit counting (hosted version) ---------- */
+/* ---------- anonymous visit counting ---------- */
 const DEV_ID=(()=>{ try{ let d=localStorage.getItem("sw-dev"); if(!d){ d=Math.random().toString(36).slice(2,12); localStorage.setItem("sw-dev",d); } return d; }catch(e){ return "?"; } })();
 let VISIT=null;
 async function logVisit(){
@@ -1874,10 +1869,10 @@ function statsHTML(){
   return h;
 }
 
-/* Hugging Face token for portraits in the hosted version; kept on this device only */
+/* Hugging Face token for portraits; kept on this device only */
 const hfTok=()=>{ try{ return localStorage.getItem("sw-hf-token")||""; }catch(e){ return ""; } };
 function renderHF(){
-  const box=$("hfSec"); if(!box) return; box.hidden=!EXT; if(!EXT) return;
+  const box=$("hfSec"); if(!box) return; box.hidden=false;
   const t=hfTok();
   box.innerHTML=`<h3>איורים מ־Hugging Face</h3><p class="muted small">כדי ליצור איורים לדמויות, מדביקים כאן טוקן גישה של Hugging Face (huggingface.co ← Settings ← Access Tokens, עם הרשאה ל־Inference Providers). הטוקן נשמר רק במכשיר הזה.</p>
     <div class="gm-row"><input type="password" id="hfIn" placeholder="${t?"טוקן שמור ••••"+esc(t.slice(-4)):"hf_…"}" autocomplete="off" style="direction:ltr">
@@ -2681,7 +2676,7 @@ function modeDlg(title,body,acts){
 }
 let MG_OPEN=false;
 function modeClose(){ $("modeScrim").hidden=true; MG_OPEN=false; }
-function setMode(m){ MODE=m; if(m==="dm") for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; if(m==="player"&&!EXT&&!$("backupPanel").hidden){ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); } applyView(); renderAll(); renderGame(); renderSetTabs(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
+function setMode(m){ MODE=m; if(m==="dm") for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; applyView(); renderAll(); renderGame(); renderSetTabs(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
 $("modeBtn").onclick=()=>{
   if(EXT&&GAME) return modeGame();
   if(MODE==="player"){
@@ -2717,7 +2712,7 @@ function pwChange(){
   modeDlg("שינוי סיסמת המנחה",`<label>הסיסמה הנוכחית<input type="password" id="pwOld" autocomplete="current-password"></label>
     <label>סיסמה חדשה<input type="password" id="pwNew" autocomplete="new-password"></label>
     <label>שוב את הסיסמה החדשה<input type="password" id="pwNew2" autocomplete="new-password"></label>
-    <p class="muted small">${EXT?(GAME?"הסיסמה שייכת למשחק הזה, ולכן היא חלה על כל המכשירים שמחוברים אליו.":"המכשיר לא מחובר למשחק, ולכן הסיסמה חלה רק עליו."):"הסיסמה נשמרת בחשבון, ולכן היא חלה על כל המכשירים."} אם שכחת אותה, אפשר לבקש מ־Claude בשיחה לאפס אותה ל־123456.</p>`,[["שמירה","primary",go],["ביטול","",modeClose]]);
+    <p class="muted small">${GAME?"הסיסמה שייכת למשחק הזה, ולכן היא חלה על כל המכשירים שמחוברים אליו.":"המכשיר לא מחובר למשחק, ולכן הסיסמה חלה רק עליו."} אם שכחת אותה, אפשר לבקש מ־Claude בשיחה לאפס אותה ל־123456.</p>`,[["שמירה","primary",go],["ביטול","",modeClose]]);
 }
 $("modeScrim").addEventListener("click",e=>{ if(e.target===$("modeScrim")) modeClose(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("modeScrim").hidden) modeClose(); });
@@ -2934,7 +2929,7 @@ function prOpen(){
       ${c.portrait?`<button class="btn small del" id="prRm" ${FZ?"disabled":""}>הסרת האיור</button>`:""}
       <input type="file" id="prFile" accept="image/*" hidden></div></div>
     <div class="pr-ai"><b class="small">איור אוטומטי</b>
-      <p class="muted small">ההנחיה נבנית מפרטי הדמות, ואפשר לערוך אותה. היא נשלחת למודל Flux ${EXT?"עם טוקן Hugging Face ששמור במכשיר הזה (ב״הגדרות״ ← ״איורים״)":"דרך החיבור Hugging Custom שלך ב־claude.ai"}.</p>
+      <p class="muted small">ההנחיה נבנית מפרטי הדמות, ואפשר לערוך אותה. היא נשלחת למודל Flux עם טוקן Hugging Face ששמור במכשיר הזה (ב״הגדרות״ ← ״איורים״).</p>
       <textarea id="prPrompt" rows="5">${esc(portraitPrompt(c))}</textarea>
       <div class="pr-ai-acts"><button class="btn small primary" id="prGen" ${FZ?"disabled":""}>✨ יצירת איור ב־Hugging Face</button><button class="btn small" id="prCopy">העתקת ההנחיה (ל־Gemini)</button></div>
       <p class="small" id="prGenMsg" role="status"></p>
@@ -2949,37 +2944,13 @@ function prOpen(){
   $("prCopy").onclick=async()=>{const t=$("prPrompt").value; try{ await navigator.clipboard.writeText(t); toast("ההנחיה הועתקה"); }catch(e){ $("prPrompt").focus(); $("prPrompt").select(); toast("סמנו והעתיקו ידנית"); } };
 }
 function prClose(){ $("prScrim").hidden=true; PR_NEW=null; }
-/* portrait from Flux 1 Schnell, through the viewer's "Hugging Custom" connector */
+/* portrait from Flux 1 Schnell on Hugging Face, with the token saved on this device */
 let PR_NEW=null, PR_BUSY=false;
-const b64Blob=(b64,type)=>{ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new Blob([u],{type:type||"image/png"}); };
 async function prGen(c){
   if(PR_BUSY||frozen()) return; const msg=$("prGenMsg"), say=t=>{ if(msg) msg.textContent=t; };
-  if(EXT) return prGenHF(c,say);
-  let mcp=null; try{ mcp=window.claude&&window.claude.use?await window.claude.use("mcp"):null; }catch(e){ mcp=null; }
-  if(!mcp){ say("יצירת איור עובדת רק כשהאפליקציה פתוחה בתוך Claude, בחשבון שמחובר ל־Hugging Custom. אפשר להעתיק את ההנחיה ולהשתמש בה ב־Gemini."); return; }
-  const prompt=($("prPrompt").value||portraitPrompt(c)).trim().slice(0,900);
-  PR_BUSY=true; $("prGen").disabled=true; $("prAgain").disabled=true; say("יוצר איור… זה לוקח בדרך כלל חצי דקה עד דקה.");
-  try{
-    const r=await mcp.callTool("Hugging Custom","gr1_flux1_schnell_infer",{prompt,width:768,height:1024,num_inference_steps:4,randomize_seed:true},{cache:false});
-    const blocks=(r&&r.content)||[], img=blocks.find(b=>b&&b.type==="image"&&b.data);
-    let blob=img?b64Blob(img.data,img.mimeType):null;
-    if(!blob){ const t=blocks.filter(b=>b&&b.type==="text").map(b=>b.text).join(" "), url=(t.match(/https:\/\/\S+?\.(?:webp|png|jpe?g)/i)||[])[0];
-      if(url){ try{ const res=await fetch(url); if(res.ok) blob=await res.blob(); }catch(e){} } }
-    if(!blob){ say("Hugging Face החזיר תשובה בלי תמונה שאפשר לקרוא. נסו שוב."); return; }
-    PR_NEW=await shrinkPortrait(blob); $("prNewImg").src=PR_NEW; $("prNew").hidden=false; say("הנה האיור. אפשר להשתמש בו או לנסות שוב.");
-  }catch(e){ const code=e&&e.code;
-    say(code==="server_not_connected"||code==="server_not_found"?"החיבור Hugging Custom לא נמצא בחשבון הזה. מוסיפים אותו ב־claude.ai: הגדרות ← מחברים.":
-      code==="needs_reauth"?"צריך לחבר מחדש את Hugging Custom ב־claude.ai: הגדרות ← מחברים.":
-      code==="selection_required"?"יש יותר מחיבור אחד בשם Hugging Custom. בוחרים אחד בחלון ש־Claude מציג, ומנסים שוב.":
-      code==="not_in_manifest"||code==="approval_required"||code==="consent_required"?"האפליקציה לא קיבלה אישור להשתמש ב־Hugging Custom. לוחצים שוב ומאשרים בחלון של Claude.":
-      code==="blocked_by_policy"?"מדיניות הארגון חוסמת את הכלי הזה.":
-      code==="tool_error"?"ה־Space של Flux החזיר שגיאה. לפעמים הוא עמוס. נסו שוב בעוד רגע.":
-      code==="server_unavailable"||code==="upstream_error"?"Hugging Face לא ענה בזמן. נסו שוב בעוד דקה.":
-      code==="not_granted"||code==="capability_disabled"||code==="capability_removed"?"התצוגה הזו לא מאפשרת חיבורים. פותחים את האפליקציה ב־claude.ai ומנסים שוב.":
-      "היצירה נכשלה. נסו שוב.");
-  }finally{ PR_BUSY=false; const g=$("prGen"), a=$("prAgain"); if(g) g.disabled=frozen(); if(a) a.disabled=false; }
+  return prGenHF(c,say);
 }
-/* hosted version: straight to the Hugging Face inference API with the token saved on this device */
+/* straight to the Hugging Face inference API with the token saved on this device */
 async function prGenHF(c,say){
   const tok=hfTok(); if(!tok){ say("כדי ליצור איור צריך לשמור טוקן של Hugging Face ב״הגדרות״ ← ״איורים״. אפשר גם להעתיק את ההנחיה ולהשתמש בה ב־Gemini."); return; }
   const prompt=($("prPrompt").value||portraitPrompt(c)).trim().slice(0,900);
@@ -2991,7 +2962,7 @@ async function prGenHF(c,say){
       const client=new mod.InferenceClient(tok);
       blob=await client.textToImage({provider:"auto",model:"black-forest-labs/FLUX.1-schnell",inputs:prompt,parameters:{width:768,height:1024,num_inference_steps:4}});
     }catch(e){ st=(e&&e.httpResponse&&e.httpResponse.status)||(e&&e.status)||0; console.warn("HF providers",e); }
-    /* 2. the FLUX.1 Schnell Space (the same one Claude's connector uses), on the account's free GPU minutes */
+    /* 2. the FLUX.1 Schnell Space, on the account's free GPU minutes */
     if(!blob&&st!==401&&st!==403){ say("מנסה דרך אחרת ב־Hugging Face…");
       try{ const base="https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer", H={"Authorization":"Bearer "+tok,"Content-Type":"application/json"};
         const r1=await fetch(base,{method:"POST",headers:H,body:JSON.stringify({data:[prompt,0,true,768,1024,4]})});
@@ -3036,15 +3007,7 @@ function prPrint(){
   const done=()=>{ document.body.classList.remove("printing"); window.removeEventListener("afterprint",done); root.innerHTML=""; };
   window.addEventListener("afterprint",done); setTimeout(()=>{ try{ window.print(); }catch(e){} setTimeout(done,1500); },120);
 }
-async function prDownload(){
-  const c=cur(), {css,body}=sheetPrintHTML(c);
-  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(c.name||"דמות")} · דף דמות</title><style>${css}@media screen{body{padding:8mm 0;background:#eee}.pg{margin-bottom:8mm}}</style></head><body>${body}<script>${prFit.toString()};addEventListener("load",()=>{ try{ prFit(document); }catch(e){} setTimeout(()=>print(),300); });<\/script></body></html>`;
-  const name=`דף-דמות-${(c.name||"דמות").replace(/[\\/:*?"<>|\s]+/g,"-")}.html`; let dl=null;
-  try{dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;}catch(e){dl=null;}
-  if(dl){ try{ await dl.save({filename:name,data:html,mimeType:"text/html"}); toast("הקובץ נשמר. פותחים אותו והוא נשלח להדפסה"); prClose(); return; }catch(e){ if(e&&e.code==="declined"){ toast("השמירה בוטלה"); return; } } }
-  try{const u=URL.createObjectURL(new Blob([html],{type:"text/html"}));const a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);prClose();}catch(e){toast("לא הצלחתי לשמור את הקובץ");}
-}
-$("shPrintBtn").onclick=prOpen; $("prDl").onclick=EXT?prPrint:prDownload; if(EXT) $("prDl").textContent="🖨 הדפסה"; $("prCancel").onclick=prClose;
+$("shPrintBtn").onclick=prOpen; $("prDl").onclick=prPrint; $("prDl").textContent="🖨 הדפסה"; $("prCancel").onclick=prClose;
 $("prScrim").addEventListener("click",e=>{ if(e.target===$("prScrim")) prClose(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("prScrim").hidden) prClose(); });
 
@@ -3774,7 +3737,7 @@ $("bkLoad").onclick=()=>{$("bkFile").value="";$("bkFile").click();};
 $("bkFile").onchange=()=>{const f=$("bkFile").files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>restoreFrom(String(rd.result));rd.onerror=()=>toast("לא הצלחתי לקרוא את הקובץ");rd.readAsText(f);};
 $("bkCopy").onclick=async()=>{const t=backupJSON();try{await navigator.clipboard.writeText(t);toast("טקסט הגיבוי הועתק");}catch(e){$("bkPasteBox").hidden=false;$("bkText").value=t;$("bkText").focus();$("bkText").select();toast("סמנו והעתיקו מהתיבה");}};
 $("lockBtn").onclick=toggleLock; $("shLockBtn").onclick=toggleLock;
-$("bkReset").onclick=resetAll;
+
 $("bkClose").onclick=()=>{$("backupPanel").hidden=true;$("backupBtn").setAttribute("aria-expanded","false");};
 $("bkPaste").onclick=()=>{$("bkPasteBox").hidden=false;$("bkText").value="";$("bkText").focus();};
 $("bkPasteGo").onclick=()=>restoreFrom($("bkText").value);
@@ -4592,10 +4555,9 @@ const qst=()=>state.quest;
 function qs(id){const q=qst(); if(!q.by[id]) q.by[id]={rooms:{},goals:{},cur:null,flags:{}}; if(!q.by[id].flags) q.by[id].flags={}; return q.by[id];}
 function roomSt(bid,rid){const s=qs(bid); if(!s.rooms[rid]) s.rooms[rid]={st:"",notes:"",killed:{},took:{},traps:{}}; const r=s.rooms[rid];
   for(const k of ["killed","took","traps"]) if(!r[k]||typeof r[k]!=="object") r[k]={}; return r;}
-/* ---------- the adventure library (hosted version): books live in Firestore, books/{id}.
+/* ---------- the adventure library: books live in Firestore, books/{id}.
    The book document holds only what players may see (title, players' map); the book itself (books/{id}/dm/book) and the DM's pictures (dimg)
    open to the uploader, to the manager, and to every Google DM when the manager marks the book "for everyone". ---------- */
-const LIB_STATIC=false;   /* the site no longer carries book files: every book comes from the library */
 const LIB_ON=()=>!!(EXT&&dbRef);
 let LIB=null, LIB_ERR="", LIB_BUSY="";
 const IMG_CACHE={};
@@ -4612,7 +4574,6 @@ async function qLoadIndex(){
   const list=[]; QERR="";
   if(LIB_ON()&&gGoogle()){ try{ LIB=await libQuery(); LIB_ERR=""; for(const b of LIB) if(b.ready) list.push({id:b.id,title:b.title,source:b.source||"",lib:true}); }
     catch(e){ console.warn("library",e); LIB_ERR="err"; } }
-  if(LIB_STATIC){ try{ const r=await fetch("adventures/index.json",{cache:"no-cache"}); if(r.ok) for(const x of await r.json()) if(!list.some(y=>y.id===x.id)) list.push(x); }catch(e){} }
   if(!list.length&&LIB_ERR) QERR="לא הצלחתי לטעון את רשימת ההרפתקאות. בדקו את החיבור ורעננו.";
   QINDEX=list; return QINDEX;
 }
@@ -4624,7 +4585,7 @@ async function libImgs(id,o){
     try{ const sn=await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).get(); if(sn.exists){ got[k]=IMG_CACHE[ck]=sn.data().data; } }catch(e){} }));
   return JSON.parse(JSON.stringify(o),(k,v)=>typeof v==="string"&&/^img:[pd]\d+$/.test(v)?(got[v.slice(4)]||""):v);
 }
-const qWantFull=()=>!EXT||(gGoogle()&&(MODE==="dm"||gIsDM()||!GAME));
+const qWantFull=()=>gGoogle()&&(MODE==="dm"||gIsDM()||!GAME);
 async function qLoadBook(id){
   const full=qWantFull();
   if(QBOOKS[id]&&(!QBOOKS[id]._pub||!full)) return QBOOKS[id];
@@ -4636,8 +4597,6 @@ async function qLoadBook(id){
         b.id=b.id||id; b.title=b.title||m.title; QBOOKS[id]=await libImgs(id,b); QERR=""; return QBOOKS[id]; } }
     catch(e){ console.warn("book",e); }
   }
-  if(LIB_STATIC){ const it=(QINDEX||[]).find(x=>x.id===id&&!x.lib)||{file:"adventures/"+id+".json"};
-    try{const r=await fetch(it.file,{cache:"no-cache"}); if(!r.ok) throw new Error(r.status); QBOOKS[id]=await r.json(); QERR=""; return QBOOKS[id];}catch(e){} }
   QERR=full?"לא הצלחתי לטעון את ההרפתקה. בדקו את החיבור ורעננו.":"המפה של ההרפתקה הזו לא זמינה כרגע.";
   return null;
 }
@@ -4976,7 +4935,6 @@ $("themeBtn").onclick=()=>{const i=THEMES.findIndex(x=>x[0]===getTheme()), t=THE
 
 /* ---------- boot ---------- */
 (function(){
-  if(EXT){ document.querySelector(".app").classList.add("ext"); document.body.classList.add("ext"); }
   loadState();
   sheetInit(); advInit(); questInit(); renderCats(); renderAll(); applyView(); window.addEventListener("hashchange",applyView); connect();
 })();
