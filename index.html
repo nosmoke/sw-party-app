@@ -252,7 +252,7 @@ body.ext .not-ext{display:none}
 .st-days{display:grid;gap:3px}.st-day{display:grid;grid-template-columns:9.5em minmax(0,1fr) 4.5em;gap:8px;align-items:center;font-size:.82rem}
 .st-bar{height:10px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden}.st-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
 .st-n{font-variant-numeric:tabular-nums;text-align:start}
-.app.player #gmStats,.app.player #gmDms{display:none}
+.app.player #gmStats,.app.player #gmDms,.app.player #gmLib{display:none}
 .btn.mode{font-weight:600}.app.dm .btn.mode{border-color:var(--accent);color:var(--accent)}
 .frozen-note{margin:0;padding:8px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);font-size:.9rem}
 .frozen-note[hidden]{display:none}
@@ -1459,6 +1459,52 @@ function checks(c){
   return out.sort((a,b)=>order[a.lv]-order[b.lv]);
 }
 
+/* ---------- hosted games keep the DM's secrets apart: the shared document has what players may see,
+   games/{code}/dm/main (readable only by the game's DMs) has the adventure book progress, the full fight, the monster library ---------- */
+const clone=o=>JSON.parse(JSON.stringify(o));
+function pcCombat(cb){ if(!cb) return null; const o=Object.assign({},cb);   /* what a player screen may know of a fight */
+  o.mons=(cb.mons||[]).filter(m=>!(m.cond||[]).includes("בלתי נראה")).map(m=>({id:m.id,name:m.name,out:m.out||"",cond:(m.cond||[]).filter(x=>x!=="בלתי נראה"),hurt:!!(m.hurt||(m.hpMax&&m.hp<m.hpMax))}));
+  o.pub=true; return o; }
+function secOf(s){ const q=s.quest||{}, a=s.adv||{};
+  return {by:q.by||{}, combat:(a.combat&&!a.combat.pub)?a.combat:null, lib:a.lib||[], dm:s.dm||null}; }
+function pubOf(s){ const o=clone(s), q=o.quest||(o.quest={active:null,by:{}}), seen={};
+  for(const [bid,b] of Object.entries(q.by||{})){ const r=Object.keys((b&&b.rooms)||{}).filter(k=>b.rooms[k]&&b.rooms[k].st); if(r.length) seen[bid]=r; }
+  q.by={}; q.seen=seen; if(o.adv){ o.adv.combat=pcCombat(o.adv.combat); o.adv.lib=[]; } delete o.dm; return o; }
+/* a shared document as a player screen holds it: the visited rooms become marks the map can draw */
+function fromPub(r){ const q=r&&r.quest; if(q&&q.seen&&typeof q.seen==="object"){ if(!q.by||!Object.keys(q.by).length){ q.by={};
+    for(const [bid,ids] of Object.entries(q.seen)) q.by[bid]={rooms:Object.fromEntries((ids||[]).map(k=>[k,{st:"seen",notes:"",killed:{},took:{},traps:{}}])),goals:{},cur:null,flags:{}}; }
+  delete q.seen; } return r; }
+function secApply(st,x){ if(!x) return st; st.quest=st.quest||{active:null,by:{}}; st.quest.by=x.by||{}; st.adv=st.adv||ADV_DEF();
+  st.adv.combat=x.combat||null; st.adv.lib=Array.isArray(x.lib)?x.lib:[]; if(x.dm) st.dm=x.dm; else delete st.dm; return st; }
+let secStore=null, secUnsub=null, SEC_READY=false, SEC_BUSY=false, SEC_LAST="", secSaved=null, SEC_MIG=null;
+function secReset(){ if(secUnsub){ try{secUnsub();}catch(e){} } secUnsub=null; secStore=null; SEC_READY=false; SEC_BUSY=false; SEC_LAST=""; secSaved=null; SEC_MIG=null; }
+/* a DM's screen brings in the secret part; the first DM to open a game saved the old way moves the secrets out of the shared document */
+async function secEnsure(){
+  if(!EXT||!GAME||!dbRef||!store||!gIsDM()||SEC_READY||SEC_BUSY) return; SEC_BUSY=true; const g=GAME;
+  try{ const ref=dbRef.doc("games/"+g+"/dm/main"), sn=await ref.get(); if(g!==GAME) return;
+    secStore=ref;
+    if(sn.exists){ let x=null; try{ x=JSON.parse(sn.data().json); }catch(e){}
+      if(x){ secApply(state,x); normalize(state); saveLocal(); renderAll(); if(location.hash==="#map") renderMap(); }
+      SEC_LAST=x?JSON.stringify(x):""; secSaved=sn.data().savedAt||null; }
+    else { if(SEC_MIG) secApply(state,SEC_MIG); SEC_LAST=""; }
+    SEC_READY=true; SEC_MIG=null;
+    if(!sn.exists||NEED_PJ) schedule();   /* writes the secret part, then the shared part without it */
+    if(secStore.onSnapshot&&!secUnsub) secUnsub=secStore.onSnapshot(sn2=>{ try{
+      if(!sn2||!sn2.exists||g!==GAME) return; const d=sn2.data(); if(!d||d.savedAt===secSaved||dirty||writing) return;
+      let x=null; try{ x=JSON.parse(d.json); }catch(e){} if(!x) return;
+      secSaved=d.savedAt; SEC_LAST=JSON.stringify(x); secApply(state,x); normalize(state); saveLocal(); renderAll(); if(location.hash==="#map") renderMap();
+    }catch(e){} },()=>{});
+  }catch(e){ console.warn("dm part",e); }
+  finally{ SEC_BUSY=false; }
+}
+let NEED_PJ=false;
+/* reads a game document: the shared part, or a game still saved the old way (one document with everything) */
+function gDocState(d){ let r=null;
+  if(d&&d.pj){ try{ r=JSON.parse(d.pj); }catch(e){} if(r) fromPub(r); NEED_PJ=!!d.json; }
+  else if(d&&d.json){ try{ r=JSON.parse(d.json); }catch(e){} NEED_PJ=true; }
+  if(d&&d.json&&!SEC_READY){ try{ const old=JSON.parse(d.json); SEC_MIG=secOf(old); }catch(e){} }
+  return r; }
+
 /* ---------- persistence ---------- */
 function normLine(l){ const it=!l.custom&&BY[l.ref]; if(!it) return;
   if(it.pack){ if(!l.pack){ l.qty=(Number(l.qty)||0)*it.pack; l.pack=it.pack; } l.name=it.uname; l.p=it.p/it.pack; l.w=(it.w||0)/it.pack; }
@@ -1478,13 +1524,18 @@ function schedule(){dirty=true;saveLocal();setSave("שומר…");clearTimeout(s
 async function flush(){
   if(!store){setSave("נשמר במכשיר הזה בלבד");dirty=false;return;}
   if(writing){clearTimeout(saveTimer);saveTimer=setTimeout(flush,400);return;}
-  if(frozen()){ dirty=false; setSave("מצב שחקנים: מקבל עדכונים מהמנחה"); return; }   /* a player screen during an adventure only reads */
+  const mig=EXT&&SEC_READY&&gIsDM()&&(NEED_PJ||!SEC_LAST);   /* moving a game to the split layout happens even while this DM screen shows the players' view */
+  if(frozen()&&!mig){ dirty=false; setSave("מצב שחקנים: מקבל עדכונים מהמנחה"); return; }   /* a player screen during an adventure only reads */
   writing=true;dirty=false;
   try{const at=new Date().toISOString(); lastSaved=at;
     /* pictures first, each in its own document; then the party without them */
     if(dbRef){ for(const c of state.chars){ if(c.portrait&&c.porV&&PR_SYNCED[c.id]!==c.porV){ await porDoc(c.id).set({img:c.portrait,v:c.porV,savedAt:at}); PR_SYNCED[c.id]=c.porV; } }
       for(const cid of Object.keys(PR_SYNCED)){ const c=state.chars.find(x=>x.id===cid); if(!c||!c.portrait){ try{ await porDoc(cid).delete(); }catch(e){} delete PR_SYNCED[cid]; } } }
-    if(EXT){ await store.update({json:stripPor(state),savedAt:at}); setSave("נשמר במשחק, זמין לכל המחוברים אליו"); }
+    if(EXT){
+      if(secStore&&SEC_READY&&gIsDM()){ const x=secOf(state), sj=JSON.stringify(x); if(sj!==SEC_LAST){ secSaved=at; await secStore.set({json:sj,savedAt:at}); SEC_LAST=sj; } }
+      const up={pj:stripPor(pubOf(state)),savedAt:at}; if(NEED_PJ&&SEC_READY&&gIsDM()) up.json="";   /* the old all-in-one copy goes once the DM part is saved */
+      await store.update(up); if(up.json==="") NEED_PJ=false;
+      setSave("נשמר במשחק, זמין לכל המחוברים אליו"); }
     else { await store.set({json:stripPor(state),savedAt:at}); setSave("נשמר בחשבון שלך, זמין מכל מכשיר"); } }
   catch(e){setSave(EXT?"השמירה למשחק נכשלה, נשמר במכשיר הזה":"השמירה לחשבון נכשלה, נשמר במכשיר הזה");}
   writing=false;
@@ -1505,21 +1556,22 @@ async function connect(){
     if(EXT&&want!==GAME) return;   /* the device switched games while this one was loading */
     if(EXT&&!snap.exists){ store=null; toast("המשחק "+isoCode(GAME)+" לא נמצא. ייתכן שהוא נמחק"); await switchGame(null); return; }
     if(snap.exists){
-      let remote=null; try{remote=JSON.parse(snap.data().json);}catch(e){}
+      let remote=null; if(EXT) remote=gDocState(snap.data()); else try{remote=JSON.parse(snap.data().json);}catch(e){}
       if(valid(remote)&&!dirty){const prev=state; state=normalize(remote);saveLocal();renderAll(); await pullPortraits(prev);}
-      if(EXT){ GMETA=gmMeta(snap.data()); renderModeBtn(); }
+      if(EXT){ GMETA=gmMeta(snap.data()); renderModeBtn(); secEnsure(); }
       setSave(EXT?"מחובר למשחק: השינויים נשמרים לכל המחוברים":"נשמר בחשבון שלך, זמין מכל מכשיר");
     }else await flush();
     renderGame();
     /* live: when the same account saves from another device (the DM's screen), apply it here */
     if(store.onSnapshot&&!unsub) unsub=store.onSnapshot(snap=>{ try{
       if(!snap||!snap.exists){ if(EXT&&GAME===want&&snap&&!(snap.metadata&&snap.metadata.fromCache)){ toast("המנחה מחקה את המשחק הזה"); switchGame(null); } return; }
-      const d=snap.data(); if(EXT&&d){ const was=GMETA?JSON.stringify(GMETA.dms):""; GMETA=gmMeta(d); if(MODE==="dm"&&!gIsDM()){ setMode("player"); }
+      const d=snap.data(); if(EXT&&d){ const was=GMETA?JSON.stringify(GMETA.dms):""; GMETA=gmMeta(d); if(MODE==="dm"&&!gIsDM()){ setMode("player"); } secEnsure();
         if(was!==JSON.stringify(GMETA.dms)&&gGoogle()){ MYLIST=null; if(!$("backupPanel").hidden&&!document.activeElement.closest("#gmSec")) renderGame(); } } if(!d||d.savedAt===lastSaved) return;
-      if(dirty||writing) return; let remote=null; try{remote=JSON.parse(d.json);}catch(e){} if(!valid(remote)) return;
-      const keep=state.current, prev=state; state=normalize(remote); if(state.chars.some(c=>c.id===keep)) state.current=keep;   /* each device keeps its own selected character */
+      if(dirty||writing) return; let remote=null; if(EXT) remote=gDocState(d); else try{remote=JSON.parse(d.json);}catch(e){} if(!valid(remote)) return;
+      const keep=state.current, prev=state, sx=SEC_READY?secOf(prev):null; state=normalize(sx?secApply(remote,sx):remote); if(state.chars.some(c=>c.id===keep)) state.current=keep;   /* each device keeps its own selected character */
       for(const c of state.chars){ const o=prev.chars.find(x=>x.id===c.id); if(o&&o.portrait&&o.porV===c.porV) c.portrait=o.portrait; }
       lastSaved=d.savedAt; saveLocal(); renderAll(); if(location.hash==="#map") renderMap(); pullPortraits(prev);
+      if(EXT&&NEED_PJ&&SEC_READY&&gIsDM()) schedule();   /* an old copy of the app saved everything in the shared document: split it again */
     }catch(e){} }, ()=>{});
   }catch(e){store=null;setSave("נשמר במכשיר הזה בלבד");}
 }
@@ -1551,7 +1603,7 @@ function loadState(){
 async function switchGame(code){
   clearTimeout(saveTimer); if(dirty&&store&&!writing){ try{ await flush(); }catch(e){} }
   if(unsub){ try{unsub();}catch(e){} unsub=null; }
-  store=null; lastSaved=null; dirty=false; GMETA=null; for(const k of Object.keys(PR_SYNCED)) delete PR_SYNCED[k];
+  store=null; lastSaved=null; dirty=false; GMETA=null; for(const k of Object.keys(PR_SYNCED)) delete PR_SYNCED[k]; secReset(); NEED_PJ=false;
   GAME=code||null; try{ if(GAME) localStorage.setItem("sw-game",GAME); else localStorage.removeItem("sw-game"); }catch(e){}
   loadState(); MODE="player"; applyView(); renderAll(); if(location.hash==="#map") renderMap();
   renderGame(); await connect(); renderGame();
@@ -1598,7 +1650,8 @@ async function gmCreate(){
     if(copy){ for(const c of state.chars){ const s2=st.chars.find(x=>x.id===c.id); if(c.portrait){ const v=c.porV||Date.now().toString(36)+c.id.slice(-3); s2.porV=v; s2.portrait=c.portrait;
         await dbRef.doc("games/"+code+"/por/"+c.id).set({img:c.portrait,v,savedAt:new Date().toISOString()}); } } }
     const at=new Date().toISOString();
-    await dbRef.doc("games/"+code).set({json:stripPor(st),savedAt:at,created:at,name:name||("משחק "+fmtCode(code)),owner:EXT.uid(),ownerEmail:gEmail(),dms:[gEmail()]});
+    await dbRef.doc("games/"+code).set({pj:stripPor(pubOf(st)),savedAt:at,created:at,name:name||("משחק "+fmtCode(code)),owner:EXT.uid(),ownerEmail:gEmail(),dms:[gEmail()]});
+    await dbRef.doc("games/"+code+"/dm/main").set({json:JSON.stringify(secOf(st)),savedAt:at});
     try{ localStorage.setItem("sw-game-"+code,JSON.stringify(st)); }catch(e){ try{ localStorage.setItem("sw-game-"+code,stripPor(st)); }catch(e2){} }
     GBUSY=false; GLIST=null; MYLIST=null; await switchGame(code); MODE="dm"; applyView(); renderAll(); renderGame(); renderModeBtn();
     toast("נוצר משחק חדש. הקוד: "+isoCode(code));
@@ -1606,7 +1659,7 @@ async function gmCreate(){
 }
 async function gmLoadList(){
   if(!EXT||!dbRef||!gGoogle()) return;
-  const row=d=>{ const x=d.data()||{}; let names=[]; try{ names=JSON.parse(x.json).chars.map(c=>c.name); }catch(e){}
+  const row=d=>{ const x=d.data()||{}; let names=[]; try{ names=JSON.parse(x.pj||x.json).chars.map(c=>c.name); }catch(e){}
     return {code:d.id,name:x.name||"",created:x.created||"",savedAt:x.savedAt||"",names,owner:x.owner||"",ownerEmail:x.ownerEmail||"",dms:Array.isArray(x.dms)?x.dms:[]}; };
   const sort=a=>a.sort((p,q)=>String(q.savedAt).localeCompare(String(p.savedAt)));
   if(EXT.isAdmin()){ GLIST="loading"; renderGame();
@@ -1620,6 +1673,7 @@ async function gmLoadList(){
 function gmDelete(code,name){
   ask("למחוק את המשחק?",`המשחק "${name||isoCode(code)}" (${isoCode(code)}) יימחק לגמרי, עם כל הדמויות והאיורים שבו. מכשירים שמחוברים אליו יחזרו לחבורה ששמורה בהם. אי אפשר לבטל את זה.`,"מחיקה לצמיתות",async()=>{
     try{ const ps=await dbRef.collection("games/"+code+"/por").get(); for(const d of ps.docs) await dbRef.doc("games/"+code+"/por/"+d.id).delete();
+      try{ await dbRef.doc("games/"+code+"/dm/main").delete(); }catch(e){}
       await dbRef.doc("games/"+code).delete(); try{ localStorage.removeItem("sw-game-"+code); }catch(e){}
       toast("המשחק נמחק"); if(code===GAME) await switchGame(null); }
     catch(e){ toast("המחיקה נכשלה"); }
@@ -1681,6 +1735,7 @@ function renderGame(){
   }
   h+=`<p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות באופן אנונימי (מתי, סוג המכשיר ולאיזה משחק), לצורך ניהול בלבד.</p></div>`;
   if(google&&admin) h+=`<div id="gmStats" data-tab="stats">${statsHTML()}</div><div id="gmDms" data-tab="dms"></div>`;
+  if(online) h+=`<div id="gmLib" data-tab="lib"></div>`;
   box.innerHTML=h; bkSummary();
   const on=(id,f)=>{ const e=$(id); if(e) e.onclick=f; };
   on("gmCopy",async()=>{ try{ await navigator.clipboard.writeText(GAME); toast("הקוד הועתק"); }catch(e){ toast("הקוד: "+isoCode(GAME)); } });
@@ -1704,6 +1759,7 @@ function renderGame(){
   if(google&&online&&(admin?GLIST:MYLIST)==null) gmLoadList();
   if(admin&&online&&STATS==null) statsLoad();
   if(admin&&google){ dmsPaint(); if(online&&DMS==null) dmsLoad(); }
+  if(online){ libPaint(); if(google&&LIB==null) libLoad(); }
   renderHF(); renderSetTabs();
 }
 /* the settings panel shows one part at a time; which parts exist depends on the version, the mode and the account */
@@ -1711,7 +1767,7 @@ let SET_TAB="";
 function renderSetTabs(){
   const bar=$("setTabs"); if(!bar) return;
   const dm=MODE==="dm", admin=!!(EXT&&EXT.isAdmin&&EXT.isAdmin()&&gGoogle());
-  const tabs=EXT?[["game","משחק"],["acct","חשבון מנחה"],["hf","איורים"],...(admin&&dm?[["stats","כניסות"],["dms","מנחים"]]:[]),...(dm?[["backup","גיבוי"]]:[])]:[["backup","גיבוי"]];
+  const tabs=EXT?[["game","משחק"],["acct","חשבון מנחה"],["hf","איורים"],...(dm?[["lib","ספרייה"]]:[]),...(admin&&dm?[["stats","כניסות"],["dms","מנחים"]]:[]),...(dm?[["backup","גיבוי"]]:[])]:[["backup","גיבוי"]];
   if(!tabs.some(t=>t[0]===SET_TAB)) SET_TAB=tabs[0][0];
   bar.hidden=tabs.length<2;
   bar.innerHTML=tabs.map(([k,l])=>`<button type="button" role="tab" data-st="${k}" aria-selected="${k===SET_TAB}">${l}</button>`).join("");
@@ -1723,8 +1779,9 @@ async function gSignIn(){
   catch(e){ const er=$("gmErr")||$("modeErr"); if(er) er.textContent="הכניסה עם Google לא הושלמה"; }
 }
 if(EXT&&EXT.onAuth) EXT.onAuth(()=>{
-  GLIST=null; MYLIST=null; STATS=null; DMS=null; dmTouch();
+  GLIST=null; MYLIST=null; STATS=null; DMS=null; LIB=null; QINDEX=null; for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; dmTouch();
   if(MODE==="dm"&&GAME&&!gIsDM()) setMode("player");
+  secEnsure();
   if(MG_OPEN&&MODE==="player"&&GAME) modeGame();   /* the dialog follows the account: into DM mode, or says this account is not a DM */
   renderGame(); renderModeBtn();
 });
@@ -2626,7 +2683,7 @@ function modeDlg(title,body,acts){
 }
 let MG_OPEN=false;
 function modeClose(){ $("modeScrim").hidden=true; MG_OPEN=false; }
-function setMode(m){ MODE=m; if(m==="player"&&!EXT&&!$("backupPanel").hidden){ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); } applyView(); renderAll(); renderGame(); renderSetTabs(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
+function setMode(m){ MODE=m; if(m==="dm") for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; if(m==="player"&&!EXT&&!$("backupPanel").hidden){ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); } applyView(); renderAll(); renderGame(); renderSetTabs(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
 $("modeBtn").onclick=()=>{
   if(EXT&&GAME) return modeGame();
   if(MODE==="player"){
@@ -4367,7 +4424,7 @@ function lightPlayersHTML(){
 function combatPlayersHTML(){
   const cb=adv().combat; if(!cb) return `<p class="muted">אין קרב פעיל.</p>`;
   const hide=m=>(m.cond||[]).includes("בלתי נראה");
-  const st=m=>m.out==="dead"?["מת","dead"]:m.out==="fled"?["ברח",""]:m.out==="subdued"?["הובס / נכנע",""]:(m.hpMax&&m.hp<m.hpMax)?["פצוע","hurt"]:["חי",""];
+  const st=m=>m.out==="dead"?["מת","dead"]:m.out==="fled"?["ברח",""]:m.out==="subdued"?["הובס / נכנע",""]:(m.hurt||(m.hpMax&&m.hp<m.hpMax))?["פצוע","hurt"]:["חי",""];
   const ms=cb.mons.filter(m=>!hide(m));
   return `<h3 class="pcmb-h">קרב פעיל · סיבוב ${cb.round}</h3>
     ${ms.length?`<ul class="pcmb">${ms.map(m=>{const [t,k]=st(m), cs=(m.cond||[]).filter(x=>x!=="בלתי נראה");
@@ -4488,18 +4545,120 @@ const qst=()=>state.quest;
 function qs(id){const q=qst(); if(!q.by[id]) q.by[id]={rooms:{},goals:{},cur:null,flags:{}}; if(!q.by[id].flags) q.by[id].flags={}; return q.by[id];}
 function roomSt(bid,rid){const s=qs(bid); if(!s.rooms[rid]) s.rooms[rid]={st:"",notes:"",killed:{},took:{},traps:{}}; const r=s.rooms[rid];
   for(const k of ["killed","took","traps"]) if(!r[k]||typeof r[k]!=="object") r[k]={}; return r;}
+/* ---------- the adventure library (hosted version): books live in Firestore, books/{id}.
+   The book document holds only what players may see (title, players' map); the book itself (books/{id}/dm/book) and the DM's pictures (dimg)
+   open to the uploader, to the manager, and to every Google DM when the manager marks the book "for everyone". ---------- */
+const LIB_STATIC=true;   /* until the built-in books are uploaded: books not yet in the library still come from the site's files */
+const LIB_ON=()=>!!(EXT&&dbRef);
+let LIB=null, LIB_ERR="", LIB_BUSY="";
+const IMG_CACHE={};
+async function libQuery(){
+  const row=d=>Object.assign({id:d.id},d.data()), m=new Map();
+  if(EXT.isAdmin()) for(const d of (await dbRef.collection("books").get()).docs) m.set(d.id,row(d));
+  else { for(const d of (await dbRef.collection("books").where("everyone","==",true).get()).docs) m.set(d.id,row(d));
+    for(const d of (await dbRef.collection("books").where("owner","==",EXT.uid()).get()).docs) m.set(d.id,row(d)); }
+  return [...m.values()].sort((a,b)=>String(a.title).localeCompare(String(b.title),"he"));
+}
 async function qLoadIndex(){
   if(QINDEX) return QINDEX;
-  try{const r=await fetch("adventures/index.json",{cache:"no-cache"}); if(!r.ok) throw new Error(r.status); QINDEX=await r.json(); QERR="";}
-  catch(e){QINDEX=null; QERR="לא הצלחתי לטעון את רשימת ההרפתקאות. בדקו את החיבור ורעננו.";}
-  return QINDEX;
+  const list=[]; QERR="";
+  if(LIB_ON()&&gGoogle()){ try{ LIB=await libQuery(); LIB_ERR=""; for(const b of LIB) if(b.ready) list.push({id:b.id,title:b.title,source:b.source||"",lib:true}); }
+    catch(e){ console.warn("library",e); LIB_ERR="err"; } }
+  if(LIB_STATIC){ try{ const r=await fetch("adventures/index.json",{cache:"no-cache"}); if(r.ok) for(const x of await r.json()) if(!list.some(y=>y.id===x.id)) list.push(x); }catch(e){} }
+  if(!list.length&&LIB_ERR) QERR="לא הצלחתי לטעון את רשימת ההרפתקאות. בדקו את החיבור ורעננו.";
+  QINDEX=list; return QINDEX;
 }
+/* the pictures of a library book are stored apart; "img:p0" / "img:d1" inside the book point to them */
+async function libImgs(id,o){
+  const keys=new Set(); JSON.stringify(o,(k,v)=>{ if(typeof v==="string"&&/^img:[pd]\d+$/.test(v)) keys.add(v.slice(4)); return v; });
+  const got={};
+  await Promise.all([...keys].map(async k=>{ const ck=id+"/"+k; if(IMG_CACHE[ck]){ got[k]=IMG_CACHE[ck]; return; }
+    try{ const sn=await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).get(); if(sn.exists){ got[k]=IMG_CACHE[ck]=sn.data().data; } }catch(e){} }));
+  return JSON.parse(JSON.stringify(o),(k,v)=>typeof v==="string"&&/^img:[pd]\d+$/.test(v)?(got[v.slice(4)]||""):v);
+}
+const qWantFull=()=>!EXT||(gGoogle()&&(MODE==="dm"||gIsDM()||!GAME));
 async function qLoadBook(id){
-  if(QBOOKS[id]) return QBOOKS[id];
-  const it=(QINDEX||[]).find(x=>x.id===id); if(!it) return null;
-  try{const r=await fetch(it.file,{cache:"no-cache"}); if(!r.ok) throw new Error(r.status); QBOOKS[id]=await r.json(); QERR="";}
-  catch(e){QERR="לא הצלחתי לטעון את ההרפתקה. בדקו את החיבור ורעננו.";}
-  return QBOOKS[id]||null;
+  const full=qWantFull();
+  if(QBOOKS[id]&&(!QBOOKS[id]._pub||!full)) return QBOOKS[id];
+  if(LIB_ON()){
+    try{ const sn=await dbRef.doc("books/"+id).get();
+      if(sn.exists&&sn.data().ready){ const m=sn.data(); let b=null;
+        if(full){ try{ const d=await dbRef.doc("books/"+id+"/dm/book").get(); if(d.exists) b=JSON.parse(d.data().json); }catch(e){} }
+        if(!b){ b=JSON.parse(m.pub||"{}"); b._pub=true; }
+        b.id=b.id||id; b.title=b.title||m.title; QBOOKS[id]=await libImgs(id,b); QERR=""; return QBOOKS[id]; } }
+    catch(e){ console.warn("book",e); }
+  }
+  if(LIB_STATIC){ const it=(QINDEX||[]).find(x=>x.id===id&&!x.lib)||{file:"adventures/"+id+".json"};
+    try{const r=await fetch(it.file,{cache:"no-cache"}); if(!r.ok) throw new Error(r.status); QBOOKS[id]=await r.json(); QERR=""; return QBOOKS[id];}catch(e){} }
+  QERR=full?"לא הצלחתי לטעון את ההרפתקה. בדקו את החיבור ורעננו.":"המפה של ההרפתקה הזו לא זמינה כרגע.";
+  return null;
+}
+/* ---- uploading: a file made for the app, {format:"sw-adventure", books:[{book, images:{path:dataURL}}]} ---- */
+function libFitImg(data){ return new Promise(res=>{ if(data.length<900000) return res(data);
+  const im=new Image(); im.onload=()=>{ let w=im.naturalWidth,h=im.naturalHeight,q=.85,out=data;
+    for(let i=0;i<8&&out.length>=900000;i++){ const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(im,0,0,w,h);
+      out=c.toDataURL("image/jpeg",q); if(q>.6) q-=.1; else { w=Math.round(w*.85); h=Math.round(h*.85); } }
+    res(out.length<900000?out:null); }; im.onerror=()=>res(null); im.src=data; }); }
+async function libPut(entry,everyone,say){
+  const book=entry&&entry.book, images=(entry&&entry.images)||{};
+  const id=String(book&&book.id||"").trim();
+  if(!/^[a-z0-9][a-z0-9-]{1,40}$/.test(id)||!book.title||!Array.isArray(book.rooms)) throw new Error("הקובץ לא נראה כמו הרפתקה של האפליקציה");
+  const ex=await dbRef.doc("books/"+id).get(); const old=ex.exists?ex.data():null;
+  if(old&&old.owner!==EXT.uid()&&!EXT.isAdmin()) throw new Error(`כבר יש בספרייה הרפתקה בשם "${old.title}" עם המזהה ${id}`);
+  const P=book.map&&book.map.players, pp=new Set(P?[P.file,...(P.patches||[]).map(x=>x.file)].filter(Boolean):[]);
+  const key={}; let pi=0,di=0; for(const path of Object.keys(images)) key[path]=pp.has(path)?"p"+(pi++):"d"+(di++);
+  const swap=o=>JSON.parse(JSON.stringify(o),(k,v)=>typeof v==="string"&&key[v]?"img:"+key[v]:v);
+  const dmb=swap(book), pub={id,title:book.title,source:book.source||"",levels:book.levels||"",map:P?{players:swap({players:P}).players}:null};
+  const at=new Date().toISOString();
+  const meta={title:String(book.title).slice(0,80),source:String(book.source||"").slice(0,120),levels:String(book.levels||"").slice(0,40),
+    owner:old?old.owner:EXT.uid(),ownerEmail:old?old.ownerEmail:gEmail(),everyone:old?!!old.everyone:!!(everyone&&EXT.isAdmin()),
+    ready:false,savedAt:at,pub:JSON.stringify(pub),imgs:Object.values(key)};
+  await dbRef.doc("books/"+id).set(meta);
+  let n=0; for(const [path,k] of Object.entries(key)){ say(`${book.title}: תמונה ${++n} מתוך ${Object.keys(key).length}`);
+    const d=await libFitImg(String(images[path]||"")); if(!d) throw new Error("תמונה גדולה מדי: "+path);
+    await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).set({data:d}); delete IMG_CACHE[id+"/"+k]; }
+  await dbRef.doc("books/"+id+"/dm/book").set({json:JSON.stringify(dmb),savedAt:at});
+  await dbRef.doc("books/"+id).update({ready:true});
+  delete QBOOKS[id]; return book.title;
+}
+async function libUpload(file){
+  const ev=$("libEvery"), every=!!(ev&&ev.checked), say=t=>{ LIB_BUSY=t; libPaint(); };
+  try{ say("קורא את הקובץ…"); const o=JSON.parse(await file.text()); const list=Array.isArray(o.books)?o.books:[o];
+    const done=[]; for(const e of list) done.push(await libPut(e,every,say));
+    LIB_BUSY=""; QINDEX=null; await libLoad(); toast(done.length===1?`ההרפתקה "${done[0]}" נשמרה בספרייה`:`${done.length} הרפתקאות נשמרו בספרייה`); }
+  catch(e){ console.warn(e); LIB_BUSY=""; LIB_ERR=(e&&e.message&&/[\u0590-\u05FF]/.test(e.message))?e.message:"ההעלאה נכשלה. בדקו את הקובץ ואת החיבור ונסו שוב"; libPaint(); LIB_ERR=""; }
+}
+async function libLoad(){ if(!LIB_ON()||!gGoogle()) return; LIB="loading"; libPaint();
+  try{ LIB=await libQuery(); LIB_ERR=""; }catch(e){ console.warn(e); LIB="error"; } libPaint(); }
+function libDelete(id,title){
+  ask("למחוק את ההרפתקה מהספרייה?",`"${title}" תימחק מהספרייה עם המפות והתמונות שלה. התקדמות שנשמרה במשחקים נשארת, אבל בלי הספר לא יהיה אפשר להמשיך אותה. אפשר להעלות את הקובץ שוב מאוחר יותר.`,"מחיקה",async()=>{
+    try{ const sn=await dbRef.doc("books/"+id).get(); const m=sn.exists?sn.data():{};
+      for(const k of m.imgs||[]){ try{ await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).delete(); }catch(e){} }
+      try{ await dbRef.doc("books/"+id+"/dm/book").delete(); }catch(e){}
+      await dbRef.doc("books/"+id).delete(); delete QBOOKS[id]; QINDEX=null; toast("ההרפתקה נמחקה מהספרייה"); }
+    catch(e){ toast("המחיקה נכשלה"); }
+    libLoad(); });
+}
+async function libEvery(id,on){ try{ await dbRef.doc("books/"+id).update({everyone:!!on}); QINDEX=null; toast(on?"ההרפתקה פתוחה עכשיו לכל המנחים":"ההרפתקה זמינה עכשיו רק לך"); }catch(e){ toast("השינוי נכשל"); } libLoad(); }
+function libPaint(){
+  const box=$("gmLib"); if(!box) return; const admin=EXT&&EXT.isAdmin();
+  if(!gGoogle()){ box.innerHTML=`<p class="muted small">ספריית ההרפתקאות פתוחה למנחים שנכנסו עם Google (בלשונית "חשבון מנחה").</p>`; return; }
+  let h=`<p class="muted small">${admin?"כל ההרפתקאות בספרייה. מה שמסומן \"לכל המנחים\" זמין לכל מנחה שנכנס עם Google; השאר רק למי שהעלה אותו.":"ההרפתקאות שפתוחות לכל המנחים, ואלה שהעלית בעצמך. שחקנים רואים רק את מפת השחקנים."}</p>`;
+  if(LIB==null||LIB==="loading") h+=`<p class="muted small">טוען…</p>`;
+  else if(LIB==="error") h+=`<p class="small">לא הצלחתי לטעון את הספרייה. אם עוד לא עדכנת את חוקי האבטחה ב־Firebase, זו כנראה הסיבה.</p>`;
+  else if(!LIB.length) h+=`<p class="muted small">הספרייה ריקה.</p>`;
+  else h+=`<ul class="gm-list">${LIB.map(b=>{ const mine=b.owner===EXT.uid();
+    return `<li><div class="gm-meta"><b>${esc(b.title||b.id)}</b>${b.ready?"":` <span class="tag">העלאה לא הושלמה</span>`}
+      <div class="muted small">${esc(b.source||"")}${admin&&!mine?` · הועלתה על ידי <bdi>${esc(b.ownerEmail||"")}</bdi>`:""}</div>
+      ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":"רק שלך"}</div>`}</div>
+      ${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</li>`; }).join("")}</ul>`;
+  h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json" hidden ${LIB_BUSY?"disabled":""}>
+    ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>
+    <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"קובץ הרפתקה שהוכן לאפליקציה (json). הרפתקה עם אותו מזהה מתעדכנת."}</p>`;
+  box.innerHTML=h;
+  const f=$("libFile"); if(f) f.onchange=()=>{ const x=f.files&&f.files[0]; if(x) libUpload(x); f.value=""; };
+  box.querySelectorAll("[data-lib-del]").forEach(b=>b.onclick=()=>libDelete(b.dataset.libDel,b.dataset.t));
+  box.querySelectorAll("[data-lib-every]").forEach(b=>b.onchange=()=>libEvery(b.dataset.libEvery,b.checked));
 }
 /* party basis for an adventure's own scaling instructions: size, the level most of the party has reached, average level */
 function qParty(){const cs=partyChars(), n=cs.length; if(!n) return null;

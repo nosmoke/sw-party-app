@@ -13,18 +13,53 @@ service cloud.firestore {
     function dmsOk() { return request.resource.data.get("dms", []) is list && request.resource.data.get("dms", []).size() <= 10; }
 
     match /games/{code} {
+      function game() { return get(/databases/$(database)/documents/games/$(code)).data; }
+      // the old all-in-one copy ("json") may only be emptied, by a DM, once the game is split
+      function jsonOk() { return !changes().hasAny(["json"]) || request.resource.data.json == ""; }
       allow get: if signedIn();
       allow list: if admin() || dmOf(resource.data);
-      allow create: if google() && request.resource.data.owner == request.auth.uid && dmsOk();
-      // anyone in the game saves the party; only the owner (or the manager) renames it or changes its DMs
+      allow create: if google() && request.resource.data.owner == request.auth.uid && dmsOk() && !("json" in request.resource.data);
+      // anyone in the game saves the shared part; only the owner (or the manager) renames it or changes its DMs
       allow update: if signedIn() && (
-        changes().hasOnly(["json", "savedAt"])
+        changes().hasOnly(["pj", "savedAt"])
+        || (dmOf(resource.data) && changes().hasOnly(["pj", "savedAt", "json"]) && jsonOk())
         || ((admin() || (google() && resource.data.owner == request.auth.uid))
-            && changes().hasOnly(["json", "savedAt", "name", "dms"]) && dmsOk()));
+            && changes().hasOnly(["pj", "savedAt", "json", "name", "dms"]) && jsonOk() && dmsOk()));
       allow delete: if admin() || (google() && resource.data.owner == request.auth.uid);
       match /por/{cid} {
         allow get, create, update, delete: if signedIn();
-        allow list: if admin() || dmOf(get(/databases/$(database)/documents/games/$(code)).data);
+        allow list: if admin() || dmOf(game());
+      }
+      // the DM's part: adventure book progress, the full fight, the monster library
+      match /dm/{part} {
+        allow read, write: if admin() || dmOf(game());
+      }
+    }
+
+    // the adventure library: the book document holds only what players may see;
+    // the book itself and the DM's pictures open to the uploader, the manager, and every Google DM when the book is "for everyone"
+    match /books/{id} {
+      function book() { return get(/databases/$(database)/documents/books/$(id)).data; }
+      function mine() { return admin() || (google() && book().owner == request.auth.uid); }
+      function canRead() { return mine() || (google() && book().everyone == true); }
+      allow get: if signedIn();
+      allow list: if admin() || (google() && (resource.data.everyone == true || resource.data.owner == request.auth.uid));
+      allow create: if google() && request.resource.data.owner == request.auth.uid && (admin() || request.resource.data.everyone == false);
+      allow update: if (admin() || (google() && resource.data.owner == request.auth.uid))
+        && request.resource.data.owner == resource.data.owner
+        && (admin() || request.resource.data.everyone == resource.data.everyone);
+      allow delete: if admin() || (google() && resource.data.owner == request.auth.uid);
+      match /pimg/{n} {
+        allow get: if signedIn();
+        allow create, update, delete: if mine();
+      }
+      match /dimg/{n} {
+        allow get: if canRead();
+        allow create, update, delete: if mine();
+      }
+      match /dm/{n} {
+        allow get: if canRead();
+        allow create, update, delete: if mine();
       }
     }
 
