@@ -251,6 +251,21 @@ input[type=number],input[type=text],input[type=search],select,textarea{backgroun
 .st-bar{height:10px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden}.st-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
 .st-n{font-variant-numeric:tabular-nums;text-align:start}
 .app.player #gmStats,.app.player #gmDms,.app.player #gmLib{display:none}
+.lib-acts{display:flex;gap:6px;flex-wrap:wrap}
+.bked{position:fixed;inset:0;z-index:70;background:rgba(20,16,10,.45);display:flex;align-items:center;justify-content:center;padding:12px}
+body.bked-open{overflow:hidden}
+body.bked-open .scrim{z-index:80}
+.bked-box{background:var(--bg);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);width:min(980px,100%);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+.bked-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+.bked-top select{flex:1;min-width:160px;max-width:420px}.bked-acts{display:flex;gap:6px;margin-inline-start:auto}
+.bked-body{overflow:auto;padding:10px 14px 18px}.bked-body h2{margin:4px 0 8px}
+.ed-lock{margin:8px 12px 0;padding:6px 10px;border-radius:8px;background:#f6e7c8;font-size:.88rem}
+.ed-form{display:flex;flex-wrap:wrap;gap:8px}.ed-form h3{width:100%;margin:10px 0 2px}
+.ed-f{display:flex;flex-direction:column;gap:2px;font-size:.82rem;flex:1 1 140px}.ed-f.wide{flex-basis:100%}
+.ed-f input,.ed-f textarea{font:inherit;font-size:.92rem;width:100%;box-sizing:border-box}
+.ed-arr{width:100%;display:flex;flex-direction:column;gap:8px}
+.ed-row{position:relative;display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px 8px 8px 34px;margin:0}
+.ed-del{position:absolute;left:4px;top:4px}
 .lib-prev{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px;background:var(--panel)}
 .lib-prev h4{margin:0 0 6px}.lib-pc{padding:6px 0;border-top:1px dashed var(--line)}.lib-pc:first-of-type{border-top:0}
 .lib-er{color:#a3271d;margin:4px 0;padding-inline-start:18px;font-size:.85rem}.lib-wn{margin:4px 0;padding-inline-start:18px;font-size:.85rem;color:#6b5a2e}
@@ -4585,6 +4600,123 @@ const qst=()=>state.quest;
 function qs(id){const q=qst(); if(!q.by[id]) q.by[id]={rooms:{},goals:{},cur:null,flags:{}}; if(!q.by[id].flags) q.by[id].flags={}; return q.by[id];}
 function roomSt(bid,rid){const s=qs(bid); if(!s.rooms[rid]) s.rooms[rid]={st:"",notes:"",killed:{},took:{},traps:{}}; const r=s.rooms[rid];
   for(const k of ["killed","took","traps"]) if(!r[k]||typeof r[k]!=="object") r[k]={}; return r;}
+/* ---------- the adventure editor: browse a library book outside any game, and fix its text.
+   Only the book's uploader (or the manager) edits. Rooms are edited, never added or removed, because games keep their progress by room id.
+   From a running book a room the party has cleared in this game is locked. ---------- */
+const QRAW={}, QMETA={};
+let ED=null;
+const canEditBook=id=>!!(LIB_ON()&&gGoogle()&&QRAW[id]&&QMETA[id]&&(EXT.isAdmin()||QMETA[id].owner===EXT.uid()));
+const ED_MON=[["name","שם","t"],["count","מספר","n"],["hd","קב״פ","t"],["hp","נק״פ קבועות","n"],["ac","דרג״ש","n"],["atk","התקפה","t"],["save","הצלה","n"],["move","תנועה","t"],["xp","נק״ן","n"],["special","מיוחד","a"]];
+const ED_TRAP=[["name","שם","t"],["dmg","נזק (למשל 1ק6)","t"],["text","תיאור","a"]];
+const ED_TRE=[["name","שם","t"],["gp","שווי לחלוקה במ״ז","n"],["qty","כמות","n"],["text","תיאור","a"]];
+async function edOpen(id,mode,sel){
+  if(!QRAW[id]||!QBOOKS[id]||QBOOKS[id]._pub){ toast("טוען את הספר…"); delete QBOOKS[id]; await qLoadBook(id); }
+  const b=QBOOKS[id]; if(!b||b._pub){ toast("אין לך גישה לספר המלא"); return; }
+  ED={id,mode,sel:sel||"__intro",edit:mode==="run"}; edRender();
+}
+function edClose(){ ED=null; const o=$("bkEd"); if(o) o.remove(); document.body.classList.remove("bked-open"); }
+function edLocked(rid){ if(!ED||ED.mode!=="run"||rid==="__intro") return false; const q=qst(); if(q.active!==ED.id) return false;
+  const r=((q.by[ED.id]||{}).rooms||{})[rid]; return !!(r&&r.st==="clear"); }
+const edLines=a=>(a||[]).join("\n"), edUnlines=t=>String(t||"").split("\n").map(x=>x.trim()).filter(Boolean);
+function edView(b,rid){
+  if(rid==="__intro"){ const I=b.intro||{};
+    return `<h2>${esc(b.title)}</h2>${b.source||b.levels?`<p class="muted small">${esc([b.source,b.levels].filter(Boolean).join(" · "))}</p>`:""}${b.summary?`<p>${esc(b.summary)}</p>`:""}
+      ${I.read?`<div class="q-read"><span class="lbl">להקראה</span>${esc(I.read)}</div>`:""}${(I.dm||[]).length?`<h3>למנחה</h3><ul class="q-dm">${I.dm.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+      ${b.after?`<h3>אחרי ההרפתקה</h3><p>${esc(b.after)}</p>`:""}`; }
+  const r=(b.rooms||[]).find(x=>x.id===rid); if(!r) return "";
+  const mon=(r.monsters||[]).map(m=>`<li><b>${esc(m.name)}</b>${(m.count||1)>1?` ×${m.count}`:""} <span class="muted small">${[m.hd!=null&&m.hd!==""?"קב״פ "+m.hd:"",m.hp?"נק״פ "+m.hp:"",m.ac!=null?"דרג״ש "+m.ac:"",m.atk||"",m.save?"הצלה "+m.save:"",m.move?"תנועה "+m.move:"",m.xp?m.xp+" נק״ן":""].filter(Boolean).map(esc).join(" · ")}</span>${m.special?`<div class="small">${esc(m.special)}</div>`:""}</li>`).join("");
+  return `<h2><span class="rn">${esc(r.id)}</span> ${esc(r.name||"")} ${r.page?`<small class="muted">${esc(r.page)}</small>`:""}</h2>
+    ${r.read?`<div class="q-read"><span class="lbl">להקראה</span>${esc(r.read)}</div>`:""}
+    ${(r.dm||[]).length?`<h3>למנחה</h3><ul class="q-dm">${r.dm.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+    ${r.secret?`<p class="small"><b>סודי:</b> ${esc(r.secret)}</p>`:""}${r.exits?`<p class="small"><b>יציאות:</b> ${esc(r.exits)}</p>`:""}
+    ${mon?`<h3>מפלצות</h3><ul class="q-dm">${mon}</ul>`:""}
+    ${(r.traps||[]).length?`<h3>מלכודות</h3><ul class="q-dm">${r.traps.map(t=>`<li><b>${esc(t.name)}</b>${t.dmg?` <span class="muted small">(${esc(t.dmg)})</span>`:""} ${esc(t.text||"")}</li>`).join("")}</ul>`:""}
+    ${(r.treasure||[]).length?`<h3>אוצר</h3><ul class="q-dm">${r.treasure.map(t=>`<li><b>${esc(t.name)}</b>${t.gp?` <span class="muted small">(${t.gp} מ״ז)</span>`:""} ${esc(t.text||"")}</li>`).join("")}</ul>`:""}
+    ${(r.events||[]).length?`<h3>אירועים</h3><ul class="q-dm">${r.events.map(x=>`<li>${esc(x.text||"")}</li>`).join("")}</ul>`:""}`;
+}
+function edRows(arr,list,fields,add){
+  return `<div class="ed-arr" data-arr="${arr}">${(list||[]).map((o,j)=>`<fieldset class="ed-row" data-j="${j}"><button type="button" class="btn small ghost ed-del" data-ed="del" title="הסרה">✕</button>
+      ${fields.map(([k,l,t])=>`<label class="ed-f${t==="a"?" wide":""}"><span>${l}</span>${t==="a"?`<textarea data-k="${k}" rows="2">${esc(o[k]==null?"":o[k])}</textarea>`:`<input data-k="${k}" ${t==="n"?'inputmode="decimal"':""} value="${esc(o[k]==null?"":o[k])}">`}</label>`).join("")}</fieldset>`).join("")}
+    <button type="button" class="btn small" data-ed="add" data-arr="${arr}">${add}</button></div>`;
+}
+function edForm(raw,rid){
+  const ta=(k,l,v,rows)=>`<label class="ed-f wide"><span>${l}</span><textarea data-k="${k}" rows="${rows||3}">${esc(v||"")}</textarea></label>`, inp=(k,l,v)=>`<label class="ed-f wide"><span>${l}</span><input data-k="${k}" value="${esc(v||"")}"></label>`;
+  if(rid==="__intro"){ const I=raw.intro||{};
+    return `<div class="ed-form" data-sec="__intro">${inp("title","שם ההרפתקה",raw.title)}${ta("summary","תקציר",raw.summary,4)}${ta("intro.read","פתיחה להקראה",I.read,4)}${ta("intro.dm","פתיחה למנחה (הערה בכל שורה)",edLines(I.dm),6)}${ta("after","אחרי ההרפתקה",raw.after,3)}</div>`; }
+  const r=raw.rooms.find(x=>x.id===rid);
+  return `<div class="ed-form" data-sec="${esc(rid)}"><p class="muted small">חדר ${esc(rid)}. אי אפשר לשנות את מספר החדר, כי ההתקדמות במשחקים שמורה לפיו.</p>
+    ${inp("name","שם החדר",r.name)}${ta("read","להקראה",r.read,4)}${ta("dm","למנחה (הערה בכל שורה)",edLines(r.dm),6)}${ta("secret","סודי",r.secret,2)}${inp("exits","יציאות",r.exits)}
+    <h3>מפלצות</h3>${edRows("monsters",r.monsters,ED_MON,"+ מפלצת")}
+    <h3>מלכודות</h3>${edRows("traps",r.traps,ED_TRAP,"+ מלכודת")}
+    <h3>אוצר</h3>${edRows("treasure",r.treasure,ED_TRE,"+ פריט אוצר")}</div>`;
+}
+/* reads the form into a new copy of the raw book; fields the form does not show (adjust, hits, ref, item…) are kept */
+function edCollect(){
+  const raw=JSON.parse(JSON.stringify(QRAW[ED.id])), f=$("bkEd").querySelector(".ed-form"), val=k=>{ const e=f.querySelector(`:scope > label [data-k="${k}"]`); return e?e.value:""; };
+  const setS=(o,k,v)=>{ v=String(v).trim(); if(v) o[k]=v; else delete o[k]; };
+  if(ED.sel==="__intro"){ const t=val("title").trim(); if(t) raw.title=t; setS(raw,"summary",val("summary")); setS(raw,"after",val("after"));
+    raw.intro=raw.intro||{}; setS(raw.intro,"read",val("intro.read")); const dm=edUnlines(val("intro.dm")); if(dm.length) raw.intro.dm=dm; else delete raw.intro.dm; return raw; }
+  const r=raw.rooms.find(x=>x.id===ED.sel);
+  setS(r,"name",val("name")); setS(r,"read",val("read")); setS(r,"secret",val("secret")); setS(r,"exits",val("exits"));
+  const dm=edUnlines(val("dm")); if(dm.length) r.dm=dm; else delete r.dm;
+  for(const [arr,fields] of [["monsters",ED_MON],["traps",ED_TRAP],["treasure",ED_TRE]]){
+    const old=r[arr]||[], out=[];
+    f.querySelectorAll(`[data-arr="${arr}"] > .ed-row`).forEach(row=>{ const j=row.dataset.j, o=j!==""&&old[j]?JSON.parse(JSON.stringify(old[j])):{};
+      for(const [k,,t] of fields){ const v=row.querySelector(`[data-k="${k}"]`).value.trim();
+        if(v==="") delete o[k]; else if(t==="n"&&!isNaN(Number(v))) o[k]=Number(v); else o[k]=v; }
+      if(o.name) out.push(o); });
+    if(out.length) r[arr]=out; else delete r[arr];
+  }
+  return raw;
+}
+function edRender(){
+  if(!ED) return; const b=QBOOKS[ED.id]; if(!b) return edClose();
+  let o=$("bkEd"); if(!o){ o=document.createElement("div"); o.id="bkEd"; o.className="bked"; document.body.appendChild(o); o.addEventListener("click",edClick); o.addEventListener("change",e=>{ if(e.target.id==="edSel"){ ED.sel=e.target.value; ED.edit=false; edRender(); } }); }
+  document.body.classList.add("bked-open");
+  const can=canEditBook(ED.id), locked=edLocked(ED.sel), opts=[["__intro","פתיחה וסיכום"],...(b.rooms||[]).map(r=>[r.id,`${r.id}. ${r.name||""}`])];
+  const body=ED.edit&&can&&!locked?edForm(QRAW[ED.id],ED.sel):edView(b,ED.sel);
+  o.innerHTML=`<div class="bked-box" role="dialog" aria-modal="true" aria-label="עיון בספר ההרפתקה">
+    <div class="bked-top"><b>${ED.mode==="browse"?"עיון בספר":"עריכת הספר"}: ${esc(b.title)}</b>
+      <select id="edSel" ${ED.edit?"disabled":""} aria-label="פרק בספר">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===ED.sel?"selected":""}>${esc(l)}</option>`).join("")}</select>
+      <span class="bked-acts">${ED.edit&&can&&!locked?`<button class="btn small primary" data-ed="save">שמירה</button><button class="btn small" data-ed="cancel">ביטול</button>`
+        :`${can&&!locked?`<button class="btn small" data-ed="edit">✎ עריכה</button>`:""}${ED.mode==="browse"?`<button class="btn small ghost" data-ed="prev" title="הקודם">‹</button><button class="btn small ghost" data-ed="next" title="הבא">›</button>`:""}<button class="btn small ghost" data-ed="close" aria-label="סגירה">✕</button>`}</span></div>
+    ${locked?`<p class="ed-lock">החדר הזה סומן "נוקה" במשחק הנוכחי, ולכן נעול לעריכה כאן. אפשר לערוך אותו בעיון בספר מהספרייה (הגדרות ← ספרייה).</p>`:""}
+    ${!can&&ED.mode==="browse"?`<p class="muted small">רק מי שהעלה את הספר יכול לערוך אותו.</p>`:""}
+    <div class="bked-body">${body}</div></div>`;
+  if(ED.edit&&!locked){ const fst=o.querySelector(".ed-form input,.ed-form textarea"); if(fst) fst.focus(); }
+}
+async function edClick(e){
+  const t=e.target.closest("[data-ed]"); if(!t){ if(e.target.id==="bkEd"&&!ED.edit) edClose(); return; }
+  const a=t.dataset.ed, b=QBOOKS[ED.id];
+  if(a==="close") return edClose();
+  if(a==="edit"){ ED.edit=true; return edRender(); }
+  if(a==="cancel"){ if(ED.mode==="run") return edClose(); ED.edit=false; return edRender(); }
+  if(a==="prev"||a==="next"){ const ids=["__intro",...b.rooms.map(r=>r.id)], i=ids.indexOf(ED.sel)+(a==="next"?1:-1); if(i>=0&&i<ids.length){ ED.sel=ids[i]; edRender(); $("bkEd").querySelector(".bked-body").scrollTop=0; } return; }
+  if(a==="del"){ t.closest(".ed-row").remove(); return; }
+  if(a==="add"){ const arr=t.dataset.arr, fields=arr==="monsters"?ED_MON:arr==="traps"?ED_TRAP:ED_TRE, box=t.parentElement, tmp=document.createElement("div");
+    tmp.innerHTML=edRows(arr,[{}],fields,"").replace(/data-j="0"/,'data-j=""'); const row=tmp.querySelector(".ed-row"); box.insertBefore(row,t); row.querySelector("input").focus(); return; }
+  if(a==="save"){ let raw; try{ raw=edCollect(); }catch(x){ console.warn(x); toast("קריאת הטופס נכשלה"); return; }
+    /* monsters the party already defeated in this game are counted by name: a rename carries the count over in this game */
+    const moves=[]; const q=qst(), rs=ED.sel!=="__intro"&&q.active===ED.id?((q.by[ED.id]||{}).rooms||{})[ED.sel]:null;
+    if(rs&&rs.killed){ const oldR=QRAW[ED.id].rooms.find(x=>x.id===ED.sel), newR=raw.rooms.find(x=>x.id===ED.sel), nm=(newR.monsters||[]).map(m=>m.name);
+      for(const [j,m] of (oldR.monsters||[]).entries()) if(rs.killed[m.name]>0&&!nm.includes(m.name)) moves.push([m.name,(newR.monsters||[])[j]&&newR.monsters[j].name,rs.killed[m.name]]); }
+    const go=async()=>{ try{ t.disabled=true; await edSave(raw);
+        if(moves.length&&rs){ for(const [o2,n2,k] of moves){ if(n2) rs.killed[n2]=(rs.killed[n2]||0)+k; delete rs.killed[o2]; } schedule(); }
+        toast("הספר נשמר בספרייה"); if(ED.mode==="run"){ edClose(); } else { ED.edit=false; edRender(); }
+        if(typeof renderQuest==="function"&&!$("questPane")?.hidden) renderQuest(); }
+      catch(x){ console.warn(x); t.disabled=false; toast("השמירה נכשלה. בדקו את החיבור ונסו שוב"); } };
+    if(moves.length) ask("לשנות שם של מפלצת שהובסה?",`במשחק הזה כבר הובסו בחדר: ${moves.map(([o2,,k])=>`${o2} (${k})`).join(", ")}. ${moves.every(m=>m[1])?"הספירה במשחק הזה תעבור לשם החדש.":"מפלצת שהוסרה מהחדר: הספירה שלה תימחק במשחק הזה."} במשחקים אחרים שמריצים את הספר, הספירה של השם הישן לא תופיע יותר.`,"שמירה",go);
+    else go();
+  }
+}
+async function edSave(raw){
+  const id=ED.id, at=new Date().toISOString();
+  await dbRef.doc("books/"+id+"/dm/book").set({json:JSON.stringify(raw),savedAt:at});
+  const up={savedAt:at}; if(raw.title!==QMETA[id].title){ up.title=String(raw.title).slice(0,80); let pub={}; try{ pub=JSON.parse(QMETA[id].pub||"{}"); }catch(e){} pub.title=raw.title; up.pub=JSON.stringify(pub); }
+  await dbRef.doc("books/"+id).update(up); Object.assign(QMETA[id],up);
+  QRAW[id]=raw; const nb=await libImgs(id,JSON.parse(JSON.stringify(raw))); nb.id=id; QBOOKS[id]=nb; QINDEX=null; LIB=null;
+}
+
 /* ---------- the adventure library: books live in Firestore, books/{id}.
    The book document holds only what players may see (title, players' map); the book itself (books/{id}/dm/book) and the DM's pictures (dimg)
    open to the uploader, to the manager, and to every Google DM when the manager marks the book "for everyone". ---------- */
@@ -4624,7 +4756,8 @@ async function qLoadBook(id){
       if(sn.exists&&sn.data().ready){ const m=sn.data(); let b=null;
         if(full){ try{ const d=await dbRef.doc("books/"+id+"/dm/book").get(); if(d.exists) b=JSON.parse(d.data().json); }catch(e){} }
         if(!b){ b=JSON.parse(m.pub||"{}"); b._pub=true; }
-        b.id=b.id||id; b.title=b.title||m.title; QBOOKS[id]=await libImgs(id,b); QERR=""; return QBOOKS[id]; } }
+        b.id=b.id||id; b.title=b.title||m.title; QMETA[id]=m; if(!b._pub) QRAW[id]=JSON.parse(JSON.stringify(b)); else delete QRAW[id];
+        QBOOKS[id]=await libImgs(id,b); QERR=""; return QBOOKS[id]; } }
     catch(e){ console.warn("book",e); }
   }
   QERR=full?"לא הצלחתי לטעון את ההרפתקה. בדקו את החיבור ורעננו.":"המפה של ההרפתקה הזו לא זמינה כרגע.";
@@ -4794,7 +4927,7 @@ function libPaint(){
       <div class="muted small">${esc(b.source||"")}${admin&&!mine?` · הועלתה על ידי <bdi>${esc(b.ownerEmail||"")}</bdi>`:""}</div>
       ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":mine?"רק שלך":"פתוחה לך דרך משחק שלך"}</div>`}
       ${!b.everyone&&(b.readers||[]).length&&(mine||admin)?`<div class="muted small">פתוחה גם למנחים במשחקים שמשתמשים בה: ${(b.readers||[]).map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""}</div>
-      ${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</li>`; }).join("")}</ul>`;
+      <div class="lib-acts">${b.ready?`<button class="btn small" data-lib-view="${esc(b.id)}">${admin||mine?"עיון ועריכה":"עיון"}</button>`:""}${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`;
   h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json,image/*" multiple hidden ${LIB_BUSY?"disabled":""}>
     ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>
     <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"בוחרים קובץ הרפתקה מוכן (json), או את קובץ הספר יחד עם תמונות המפות שלו. לפני השמירה מוצגת בדיקה. הרפתקה עם אותו מזהה מתעדכנת."}</p>${libPrevHTML()}`;
@@ -4802,6 +4935,7 @@ function libPaint(){
   const f=$("libFile"); if(f) f.onchange=()=>{ const x=f.files&&[...f.files]; if(x&&x.length) libPick(x); f.value=""; };
   const sv=$("libSave"); if(sv) sv.onclick=libSave; const cn=$("libCancel"); if(cn) cn.onclick=()=>{ LIB_PREV=null; LIB_ERR=""; libPaint(); };
   box.querySelectorAll("[data-lib-del]").forEach(b=>b.onclick=()=>libDelete(b.dataset.libDel,b.dataset.t));
+  box.querySelectorAll("[data-lib-view]").forEach(b=>b.onclick=()=>edOpen(b.dataset.libView,"browse"));
   box.querySelectorAll("[data-lib-every]").forEach(b=>b.onchange=()=>libEvery(b.dataset.libEvery,b.checked));
 }
 /* party basis for an adventure's own scaling instructions: size, the level most of the party has reached, average level */
@@ -4869,7 +5003,7 @@ function qAdjIntro(b){
 }
 function qIntro(b){
   const s=qs(b.id), I=b.intro||{};
-  return `<article class="q-room"><h2>${esc(b.title)}</h2>${b.summary?`<p>${esc(b.summary)}</p>`:""}
+  return `<article class="q-room"><h2>${esc(b.title)}${canEditBook(b.id)&&MODE==="dm"?` <button class="btn small ghost" data-q="edit" data-rid="__intro" title="עריכת הפתיחה והסיכום">✎ עריכה</button>`:""}</h2>${b.summary?`<p>${esc(b.summary)}</p>`:""}
    ${I.read?`<div class="q-read"><span class="lbl">להקראה${b.readNote?" (תמצית)":""} ${I.page?`<small>${esc(I.page)}</small>`:""}</span>${esc(I.read)}</div>`:""}
    ${(I.dm||[]).length?`<h3>למנחה</h3><ul class="q-dm">${I.dm.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
    ${(b.goals||[]).length?`<h3>מטרות ונק״ן</h3><ul class="q-dm">${b.goals.map(g=>`<li>${s.goals[g.id]?"✓ ":""}${esc(g.name)}: ${gXPtxt(g)}${g.page?` <small class="muted">(${esc(g.page)})</small>`:""}</li>`).join("")}</ul><p class="muted small">נק״ן של מפלצות נכנסות לקופה בסיום כל קרב, ושל מלכודות ומטרות בלחיצה עליהן.</p>`:""}
@@ -4881,7 +5015,7 @@ function qRoom(b,r){
   const rs=roomSt(b.id,r.id), pcs=partyChars();
   const who=pcs.map(c=>`<option value="${c.id}">${esc(c.name||"בלי שם")}</option>`).join("");
   let h=`<article class="q-room"><div class="q-rh"><h2><span class="rn">${esc(r.id)}</span> ${esc(r.name)} ${r.page?`<small class="muted">${esc(r.page)}</small>`:""}</h2>
-    ${b.map&&b.map.pins&&b.map.pins[r.id]?`<button class="btn small ghost" data-q="map" title="הצגת החדר במפה">🗺 במפה</button>`:""}<div class="seg" role="group" aria-label="מצב החדר">${Object.entries(Q_ST).map(([k,v])=>`<button data-q="st" data-v="${k}" aria-pressed="${rs.st===k}">${v}</button>`).join("")}</div></div>`;
+    ${b.map&&b.map.pins&&b.map.pins[r.id]?`<button class="btn small ghost" data-q="map" title="הצגת החדר במפה">🗺 במפה</button>`:""}${canEditBook(b.id)&&MODE==="dm"?`<button class="btn small ghost" data-q="edit" data-rid="${esc(r.id)}" title="עריכת החדר בספר">✎ עריכה</button>`:""}<div class="seg" role="group" aria-label="מצב החדר">${Object.entries(Q_ST).map(([k,v])=>`<button data-q="st" data-v="${k}" aria-pressed="${rs.st===k}">${v}</button>`).join("")}</div></div>`;
   const sb=qs(b.id), AJ0=qAdj(b,r), P=qParty();
   { const mo=marchOrder(); if(mo.length>1) h+=`<p class="q-march">סדר הליכה: ${mo.map((c,k)=>`${k+1}. ${esc(c.name||"בלי שם")}${lightOf(c)?" "+lightOf(c):""}${marchUp(c)?"":" (נישא)"}`).join(" · ")}</p>`; }
   if(AJ0.notes.length) h+=`<div class="q-adj"><b>⚙ הותאם לחבורה</b> <small>(${P.n} דמויות, רובן בדרגה ${P.L}${b.adjust&&b.adjust.page?` · לפי ${esc(b.adjust.page)}`:""})</small><ul>${AJ0.notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`;
@@ -5003,6 +5137,7 @@ function questInit(){
     const s=qs(b.id), room=(b.rooms||[]).find(r=>r.id===s.cur), rs=room?roomSt(b.id,room.id):null, i=Number(t.dataset.i);
     switch(act){
       case "map": QMAP=!QMAP; renderQuest(); $("qDetail")&&($("qDetail").scrollTop=0); if(QMAP) qMapFocus(); return;
+      case "edit": edOpen(b.id,"run",t.dataset.rid); return;
       case "zoom": {const v=$("qMapView"), old=QZOOM, d=Number(t.dataset.d);
         const cx=v?(v.scrollLeft+v.clientWidth/2)/v.scrollWidth:.5, cy=v?(v.scrollTop+v.clientHeight/2)/v.scrollHeight:.5;
         QZOOM=d===0?1:Math.max(1,Math.min(4,+(QZOOM*(d>0?1.5:1/1.5)).toFixed(2))); if(QZOOM<1.05) QZOOM=1; if(old===QZOOM) return;
