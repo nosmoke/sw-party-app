@@ -1,0 +1,12 @@
+<script src="config.js"></script>
+<script>
+/* hosted version: a small stand-in for Claude's page capabilities, backed by Firebase (ext.js) */
+(function(){
+  let res; const ready=new Promise(r=>res=r);
+  const X=window.SW_EXT={ready:false,failed:false,_l:[],_res:res,
+    onAuth(f){ this._l.push(f); }, isAdmin(){ return false; }, email(){ return ""; }, uid(){ return ""; } };
+  window.claude={use:async n=>{ const caps=await ready; return caps&&caps[n]||null; }};
+  setTimeout(()=>{ if(!X.ready){ X.failed=true; res(null); } },15000);
+})();
+</script>
+<script type="module" src="ext.js"></script>
