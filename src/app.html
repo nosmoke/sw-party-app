@@ -1476,20 +1476,25 @@ function checks(c){
 /* ---------- hosted games keep the DM's secrets apart: the shared document has what players may see,
    games/{code}/dm/main (readable only by the game's DMs) has the adventure book progress, the full fight, the monster library ---------- */
 const clone=o=>JSON.parse(JSON.stringify(o));
-function pcCombat(cb){ if(!cb) return null; const o=Object.assign({},cb);   /* what a player screen may know of a fight */
+function pcCombat(cb){ if(!cb) return null; const o=Object.assign({},cb); if(o.title) o.title=logStrip(o.title);   /* what a player screen may know of a fight */
   o.mons=(cb.mons||[]).filter(m=>!(m.cond||[]).includes("בלתי נראה")).map(m=>({id:m.id,name:m.name,out:m.out||"",cond:(m.cond||[]).filter(x=>x!=="בלתי נראה"),hurt:!!(m.hurt||(m.hpMax&&m.hp<m.hpMax))}));
   o.pub=true; return o; }
-function secOf(s){ const q=s.quest||{}, a=s.adv||{};
-  return {by:q.by||{}, combat:(a.combat&&!a.combat.pub)?a.combat:null, lib:a.lib||[], dm:s.dm||null}; }
+function secOf(s){ const q=s.quest||{}, a=s.adv||{}, rlog={};
+  for(const e of [...(a.log||[]),...(s.history||[]).flatMap(h=>h.log||[])]) if(e&&typeof e.t==="string"&&e.t.includes("⟦R:")) rlog[logKey(e)]=e.t;
+  return {by:q.by||{}, combat:(a.combat&&!a.combat.pub)?a.combat:null, lib:a.lib||[], dm:s.dm||null, rlog}; }
 function pubOf(s){ const o=clone(s), q=o.quest||(o.quest={active:null,by:{}}), seen={};
   for(const [bid,b] of Object.entries(q.by||{})){ const r=Object.keys((b&&b.rooms)||{}).filter(k=>b.rooms[k]&&b.rooms[k].st); if(r.length) seen[bid]=r; }
-  q.by={}; q.seen=seen; if(o.adv){ o.adv.combat=pcCombat(o.adv.combat); o.adv.lib=[]; } delete o.dm; return o; }
+  q.by={}; q.seen=seen; if(o.adv){ o.adv.combat=pcCombat(o.adv.combat); o.adv.lib=[]; for(const e of o.adv.log||[]) if(e&&typeof e.t==="string") e.t=logStrip(e.t); }
+  for(const h of o.history||[]) for(const e of h.log||[]) if(e&&typeof e.t==="string") e.t=logStrip(e.t);
+  delete o.dm; return o; }
 /* a shared document as a player screen holds it: the visited rooms become marks the map can draw */
 function fromPub(r){ const q=r&&r.quest; if(q&&q.seen&&typeof q.seen==="object"){ if(!q.by||!Object.keys(q.by).length){ q.by={};
     for(const [bid,ids] of Object.entries(q.seen)) q.by[bid]={rooms:Object.fromEntries((ids||[]).map(k=>[k,{st:"seen",notes:"",killed:{},took:{},traps:{}}])),goals:{},cur:null,flags:{}}; }
   delete q.seen; } return r; }
 function secApply(st,x){ if(!x) return st; st.quest=st.quest||{active:null,by:{}}; st.quest.by=x.by||{}; st.adv=st.adv||ADV_DEF();
-  st.adv.combat=x.combat||null; st.adv.lib=Array.isArray(x.lib)?x.lib:[]; if(x.dm) st.dm=x.dm; else delete st.dm; return st; }
+  st.adv.combat=x.combat||null; st.adv.lib=Array.isArray(x.lib)?x.lib:[]; if(x.dm) st.dm=x.dm; else delete st.dm;
+  const rl=x.rlog||{}; if(Object.keys(rl).length) for(const e of [...(st.adv.log||[]),...(st.history||[]).flatMap(h=>h.log||[])]) if(e&&typeof e.t==="string"&&e.t.includes("⟦R⟧")){ const k=logKey(e); if(rl[k]) e.t=rl[k]; }
+  return st; }
 let secStore=null, secUnsub=null, SEC_READY=false, SEC_BUSY=false, SEC_LAST="", secSaved=null, SEC_MIG=null;
 function secReset(){ if(secUnsub){ try{secUnsub();}catch(e){} } secUnsub=null; secStore=null; SEC_READY=false; SEC_BUSY=false; SEC_LAST=""; secSaved=null; SEC_MIG=null; }
 /* a DM's screen brings in the secret part; the first DM to open a game saved the old way moves the secrets out of the shared document */
@@ -1651,6 +1656,18 @@ function resetAll(){
     state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); bkSummary(); toast("הכול אופס. סיסמת המנחה חזרה ל־"+PW_DEFAULT);
   });
 }
+/* each game a DM owns takes one of five slots, dms/{uid}/slots/{1..5}; the game and its slot are written together, and the rules check both */
+async function gmSlots(){ const sn=await dbRef.collection("dms/"+EXT.uid()+"/slots").get(); return new Map(sn.docs.map(d=>[d.id,(d.data()||{}).game])); }
+async function gmFreeSlot(){ const used=await gmSlots(); for(let n=1;n<=GAME_LIMIT;n++) if(!used.has(String(n))) return String(n); return null; }
+/* games created before the slots existed get one when their owner opens the list (as long as slots are free) */
+async function gmBackfill(list){
+  if(EXT.isAdmin()||!dbRef.batch) return;
+  const mine=list.filter(g=>g.owner===EXT.uid()&&!g.slot); if(!mine.length) return;
+  try{ const used=await gmSlots();
+    for(const g of mine){ let n=null; for(let k=1;k<=GAME_LIMIT;k++) if(!used.has(String(k))){ n=String(k); break; } if(!n) break;
+      const b=dbRef.batch(); b.update(dbRef.doc("games/"+g.code),{slot:n}); b.set(dbRef.doc("dms/"+EXT.uid()+"/slots/"+n),{game:g.code}); await b.commit(); used.set(n,g.code); g.slot=n; } }
+  catch(e){ console.warn("slots",e); }
+}
 async function gmCreate(){
   const name=($("gmNewName").value||"").trim().slice(0,40), copy=$("gmNewCopy").checked, err=t=>{ $("gmErr").textContent=t; };
   if(!gGoogle()){ err("כדי ליצור משחק צריך להיכנס עם Google"); return; }
@@ -1662,8 +1679,10 @@ async function gmCreate(){
     const st=copy?JSON.parse(JSON.stringify(state)):blankState(); delete st.dm;   /* every game starts with the default DM password */
     if(copy){ for(const c of state.chars){ const s2=st.chars.find(x=>x.id===c.id); if(c.portrait){ const v=c.porV||Date.now().toString(36)+c.id.slice(-3); s2.porV=v; s2.portrait=c.portrait;
         await dbRef.doc("games/"+code+"/por/"+c.id).set({img:c.portrait,v,savedAt:new Date().toISOString()}); } } }
-    const at=new Date().toISOString();
-    await dbRef.doc("games/"+code).set({pj:stripPor(pubOf(st)),savedAt:at,created:at,name:name||("משחק "+fmtCode(code)),owner:EXT.uid(),ownerEmail:gEmail(),dms:[gEmail()]});
+    const at=new Date().toISOString(), gdoc={pj:stripPor(pubOf(st)),savedAt:at,created:at,name:name||("משחק "+fmtCode(code)),owner:EXT.uid(),ownerEmail:gEmail(),dms:[gEmail()]};
+    if(EXT.isAdmin()||!dbRef.batch) await dbRef.doc("games/"+code).set(gdoc);
+    else { const slot=await gmFreeSlot(); if(!slot){ GBUSY=false; renderGame(); err("הגעת למגבלה של "+GAME_LIMIT+" משחקים. כדי ליצור משחק חדש, מוחקים משחק קיים."); return; }
+      const bt=dbRef.batch(); bt.set(dbRef.doc("games/"+code),Object.assign(gdoc,{slot})); bt.set(dbRef.doc("dms/"+EXT.uid()+"/slots/"+slot),{game:code}); await bt.commit(); }
     await dbRef.doc("games/"+code+"/dm/main").set({json:JSON.stringify(secOf(st)),savedAt:at});
     try{ localStorage.setItem("sw-game-"+code,JSON.stringify(st)); }catch(e){ try{ localStorage.setItem("sw-game-"+code,stripPor(st)); }catch(e2){} }
     GBUSY=false; GLIST=null; MYLIST=null; await switchGame(code); MODE="dm"; applyView(); renderAll(); renderGame(); renderModeBtn();
@@ -1673,21 +1692,25 @@ async function gmCreate(){
 async function gmLoadList(){
   if(!EXT||!dbRef||!gGoogle()) return;
   const row=d=>{ const x=d.data()||{}; let names=[]; try{ names=JSON.parse(x.pj||x.json).chars.map(c=>c.name); }catch(e){}
-    return {code:d.id,name:x.name||"",created:x.created||"",savedAt:x.savedAt||"",names,owner:x.owner||"",ownerEmail:x.ownerEmail||"",dms:Array.isArray(x.dms)?x.dms:[]}; };
+    return {code:d.id,name:x.name||"",created:x.created||"",savedAt:x.savedAt||"",names,owner:x.owner||"",ownerEmail:x.ownerEmail||"",dms:Array.isArray(x.dms)?x.dms:[],slot:x.slot||""}; };
   const sort=a=>a.sort((p,q)=>String(q.savedAt).localeCompare(String(p.savedAt)));
   if(EXT.isAdmin()){ GLIST="loading"; renderGame();
     try{ GLIST=sort((await dbRef.collection("games").get()).docs.map(row)); }catch(e){ GLIST="error"; } }
   else { MYLIST="loading"; renderGame();
     try{ const a=(await dbRef.collection("games").where("owner","==",EXT.uid()).get()).docs.map(row);
       const b=(await dbRef.collection("games").where("dms","array-contains",gEmail()).get()).docs.map(row);
-      const m=new Map(); for(const g of [...a,...b]) m.set(g.code,g); MYLIST=sort([...m.values()]); }catch(e){ MYLIST="error"; } }
+      const m=new Map(); for(const g of [...a,...b]) m.set(g.code,g); MYLIST=sort([...m.values()]); }catch(e){ MYLIST="error"; }
+    if(Array.isArray(MYLIST)) await gmBackfill(MYLIST); }
   renderGame();
 }
 function gmDelete(code,name){
   ask("למחוק את המשחק?",`המשחק "${name||isoCode(code)}" (${isoCode(code)}) יימחק לגמרי, עם כל הדמויות והאיורים שבו. מכשירים שמחוברים אליו יחזרו לחבורה ששמורה בהם. אי אפשר לבטל את זה.`,"מחיקה לצמיתות",async()=>{
     try{ const ps=await dbRef.collection("games/"+code+"/por").get(); for(const d of ps.docs) await dbRef.doc("games/"+code+"/por/"+d.id).delete();
       try{ await dbRef.doc("games/"+code+"/dm/main").delete(); }catch(e){}
-      await dbRef.doc("games/"+code).delete(); try{ localStorage.removeItem("sw-game-"+code); }catch(e){}
+      let gd={}; try{ const sn=await dbRef.doc("games/"+code).get(); gd=sn.exists?sn.data():{}; }catch(e){}
+      if(gd.slot&&gd.owner&&dbRef.batch){ const bt=dbRef.batch(); bt.delete(dbRef.doc("games/"+code)); bt.delete(dbRef.doc("dms/"+gd.owner+"/slots/"+gd.slot)); await bt.commit(); }
+      else await dbRef.doc("games/"+code).delete();
+      try{ localStorage.removeItem("sw-game-"+code); }catch(e){}
       toast("המשחק נמחק"); if(code===GAME) await switchGame(null); }
     catch(e){ toast("המחיקה נכשלה"); }
     GLIST=null; MYLIST=null; gmLoadList();
@@ -4072,6 +4095,13 @@ $("lvNo").onclick=closeLevelUp;
 $("lvYes").onclick=doLevelUp;
 $("lvScrim").addEventListener("click",e=>{if(e.target===$("lvScrim"))closeLevelUp();});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-lvup]"); if(!b) return; const c=state.chars.find(x=>x.id===b.dataset.lvup); if(c) openLevelUp(c);});
+/* a room in the log or a fight title is written as a marker: the DM sees "חדר 6" or "חדר 6: name", players see just "חדר".
+   The shared part keeps only the bare marker; the room itself is in the DM part (rlog) */
+const RREF=(id,name)=>`⟦R:${String(id).replace(/[|⟧]/g,"")}|${String(name||"").replace(/[|⟧]/g,"")}⟧`;
+const RRE=/⟦R:([^|⟧]*)\|([^⟧]*)⟧/g;
+const logTxt=t=>String(t==null?"":t).replace(RRE,(m,id,nm)=>MODE==="dm"?`חדר ${id}${nm?": "+nm:""}`:"חדר").replace(/⟦R⟧/g,"חדר");
+const logStrip=t=>String(t==null?"":t).replace(RRE,"⟦R⟧");
+const logKey=e=>e.at+"|"+logStrip(e.t);
 function alog(t){const a=adv();a.log.unshift({t,at:Date.now(),r:a.combat?a.combat.round:null});if(a.log.length>300)a.log.length=300;}
 const isCaster=c=>slotsOf(c).some(n=>n>0)||(PROG[c.cls]&&PROG[c.cls].tattoos&&(c.book||[]).length>0);
 const pcState=c=>{const hp=hpOf(c);if(!c.hpMax)return"";if(hp<=-10)return"dead";if(hp<=0)return"down";return"";};
@@ -4266,7 +4296,7 @@ function combatHTML(){
       <p class="muted small">התקפת מפלצת: ק20 + מספר קוביות הפגיעה (עד 15), שווה או גבוה מהדרג״ש. מתחת לקב״פ אחת: ק20 בלי תוספות (מ 45). חוק בית: 20 טבעי פוגע ומכפיל נזק, 1 טבעי משתבש.</p></div>`;
   };
   const libOpts=adv().lib.map(x=>`<option value="${esc(x.name)}">`).join("");
-  return `<div class="cmb-h"><h3>${esc(cb.title||"קרב")} · <span class="num">סיבוב ${cb.round}</span></h3>
+  return `<div class="cmb-h"><h3>${esc(logTxt(cb.title)||"קרב")} · <span class="num">סיבוב ${cb.round}</span></h3>
      <div class="acts"><button class="btn small" data-act="surprise">בדיקת הפתעה</button><button class="btn small" data-act="init">${cb.first?"גלגול יוזמה מחדש":"גלגול יוזמה"}</button>
      ${cb.first?`<button class="btn primary small" data-act="next">${cb.side===0?"לצד הבא":"לסיבוב הבא"} ←</button>`:""}<button class="btn small del" data-act="combat-end">סיום הקרב</button></div></div>
    ${cb.surprise?`<p class="small">${esc(cb.surprise)}</p>`:""}
@@ -4403,7 +4433,7 @@ function histHTML(){
   const tf=new Intl.DateTimeFormat("he-IL",{dateStyle:"medium"}), tt=new Intl.DateTimeFormat("he-IL",{hour:"2-digit",minute:"2-digit"});
   return `<h3>הרפתקאות קודמות <small>${state.history.length}</small></h3>`+state.history.map((x,i)=>`<details><summary>${esc(x.name)} <small class="muted">· ${tf.format(new Date(x.ended))}</small></summary>
     <p class="small">${esc(x.sum||"")}</p>
-    <ul class="alog">${(x.log||[]).map(l=>`<li><span class="lg-t"><span class="muted num">${tt.format(new Date(l.at))}</span> ${esc(l.t)}</span></li>`).join("")||'<li class="muted">היומן היה ריק.</li>'}</ul>
+    <ul class="alog">${(x.log||[]).map(l=>`<li><span class="lg-t"><span class="muted num">${tt.format(new Date(l.at))}</span> ${esc(logTxt(l.t))}</span></li>`).join("")||'<li class="muted">היומן היה ריק.</li>'}</ul>
     <button class="btn small ghost" data-act="hist-rm" data-i="${i}">מחיקה מהרשימה</button></details>`).join("");
 }
 function endArchive(){
@@ -4444,7 +4474,7 @@ function renderAdv(){
   if(wasOpen&&$("monForm")) $("monForm").closest("details").open=true;
   $("advCombatBox").classList.toggle("live",!!a.combat);
   const tf=new Intl.DateTimeFormat("he-IL",{hour:"2-digit",minute:"2-digit"});
-  $("advLog").innerHTML=a.log.length?a.log.map((x,i)=>`<li><span class="lg-t"><span class="muted num">${tf.format(new Date(x.at))}${x.r?` · ס׳ ${x.r}`:""}</span> ${esc(x.t)}</span><button class="lg-x" data-act="log-rm" data-i="${i}" aria-label="מחיקת השורה">✕</button></li>`).join(""):'<li class="muted">היומן ריק.</li>';
+  $("advLog").innerHTML=a.log.length?a.log.map((x,i)=>`<li><span class="lg-t"><span class="muted num">${tf.format(new Date(x.at))}${x.r?` · ס׳ ${x.r}`:""}</span> ${esc(logTxt(x.t))}</span><button class="lg-x" data-act="log-rm" data-i="${i}" aria-label="מחיקת השורה">✕</button></li>`).join(""):'<li class="muted">היומן ריק.</li>';
   if(PL) roAdv(); else $("advPane").querySelectorAll("[data-ro]").forEach(e=>{ e.disabled=false; delete e.dataset.ro; });   /* back in DM mode: the fixed controls work again */
 }
 /* player mode: the tracker can be read, not changed */
@@ -4519,14 +4549,14 @@ function advInit(){
       case "end-take": case "end-gold": {const bk=endBook(); if(!bk) return; const r=(bk.rooms||[]).find(x=>x.id===b.dataset.r), i=Number(b.dataset.i), tr=r&&(r.treasure||[])[i]; if(!tr) return; const rs=roomSt(bk.id,r.id);
         if(act==="end-gold"){splitGold(tr.gp,()=>{rs.took[i]="חולק לחבורה"; schedule(); renderAdv();}); return;}
         const sel=pane.querySelector(`select[data-end-who="${r.id}:${i}"]`), c=sel&&state.chars.find(x=>x.id===sel.value); if(!c){toast("בחרו למי למסור"); return;}
-        giveItem(c,tr); rs.took[i]=c.name; alog(`${c.name} ${G(c,"קיבל","קיבלה")}: ${tr.name} (חדר ${r.id})`); toast(`${tr.name} עבר לרשות ${c.name}`); break;}
+        giveItem(c,tr); rs.took[i]=c.name; alog(`${c.name} ${G(c,"קיבל","קיבלה")}: ${tr.name} (${RREF(r.id)})`); toast(`${tr.name} עבר לרשות ${c.name}`); break;}
       case "end-reward": {const bk=endBook(); if(!bk||!bk.reward) return; const S=qs(bk.id), list=partyChars().filter(c=>pcState(c)!=="dead"), v=bk.reward.gpPerChar;
         ask("לשלם את התגמול?",`${v} מ״ז לכל אחת מ־${list.length} הדמויות: ${list.map(c=>c.name).join(", ")}.`,"תשלום",()=>{for(const c of list) c.gain=(Number(c.gain)||0)+toC(v); S.rewarded=true; alog(`תגמול: ${v} מ״ז לכל דמות (${bk.reward.text||bk.title})`); schedule(); renderAll();}); return;}
       case "hist-rm": {const i=Number(b.dataset.i), x=state.history[i]; if(!x) return; ask("למחוק מהרשימה?",`"${x.name}" והיומן שלה יימחקו לצמיתות.`,"מחיקה",()=>{const k=state.history.indexOf(x); if(k>=0) state.history.splice(k,1); schedule(); renderAdv();}); return;}
       case "gold-split": {const v=num("goldsplit"); if(v>0) splitGold(v); return;}
       case "log-add": {const el=$("advNote"); const t=el.value.trim(); if(!t) return; alog(t); el.value=""; break;}
       case "log-rm": {const i=Number(b.dataset.i), x=a.log[i]; if(!x) return;
-        ask("למחוק את השורה מהיומן?",x.t,"מחיקה",()=>{const k=a.log.indexOf(x); if(k>=0) a.log.splice(k,1); schedule(); renderAdv();}); return;}
+        ask("למחוק את השורה מהיומן?",logTxt(x.t),"מחיקה",()=>{const k=a.log.indexOf(x); if(k>=0) a.log.splice(k,1); schedule(); renderAdv();}); return;}
       case "log-clear": ask("לנקות את היומן?","כל הרישומים ביומן יימחקו.","ניקוי",()=>{a.log=[];schedule();renderAdv();}); return;
       default: return;
     }
@@ -5201,9 +5231,9 @@ function questInit(){
       case "time": advTime(Number(t.dataset.n)||600); break;
       case "st": rs.st=t.dataset.v; break;
       case "kill": {const m=qAdj(b,room).mons[i]; if(!m) return; rs.killed[m.name]=Math.max(0,Math.min(m.count||1,(rs.killed[m.name]||0)+Number(t.dataset.d))); break;}
-      case "fight": qFight(b,room,`חדר ${room.id}: ${room.name}`); return;
+      case "fight": qFight(b,room,RREF(room.id,room.name)); return;
       case "evfight": {const ev=room.events[i], from=(b.rooms||[]).find(x=>x.id===ev.fight.from); if(!from) return;
-        qFight(b,from,`חדר ${room.id}: ${ev.fight.label||from.name}`,()=>{ if(ev.flag&&!s.flags[ev.flag]){s.flags[ev.flag]=true; alog(`אירוע: ${((b.flags||[]).find(f=>f.id===ev.flag)||{}).name||ev.flag}`);} }); return;}
+        qFight(b,from,ev.fight.label?`${RREF(room.id)}: ${ev.fight.label}`:RREF(room.id,from.name),()=>{ if(ev.flag&&!s.flags[ev.flag]){s.flags[ev.flag]=true; alog(`אירוע: ${((b.flags||[]).find(f=>f.id===ev.flag)||{}).name||ev.flag}`);} }); return;}
       case "flag": {const id=t.dataset.id, f=(b.flags||[]).find(x=>x.id===id); s.flags[id]=!s.flags[id]; if(s.flags[id]) alog(`אירוע: ${f?f.name:id}`); break;}
       case "thit": {const tr=room.traps[i], c=state.chars.find(x=>x.id===t.dataset.id), r=tr&&rollExpr(tr.dmg); if(!c||!r) return;
         const half=!!t.dataset.half, n=half?Math.floor(r.t/2):r.t; changePC(c,-n,`${tr.name}${half?", חצי נזק":""}`); toast(`${c.name}: ${n} נזק (${tr.dmg}: ${r.txt}${half?" ÷2":""})`); renderAdv(); break;}
@@ -5218,7 +5248,7 @@ function questInit(){
         return;}
       case "gold": {const tr=room.treasure[i]; splitGold(tr.gp,()=>{rs.took[i]="חולק לחבורה"; schedule(); renderQuest();}); return;}
       case "take": {const tr=room.treasure[i], sel=root.querySelector(`select[data-qc="who"][data-i="${i}"]`), c=sel&&state.chars.find(x=>x.id===sel.value); if(!c) return;
-        giveItem(c,tr); rs.took[i]=c.name; alog(`${c.name} ${G(c,"לקח","לקחה")}: ${tr.name} (חדר ${room.id})`); toast(`${tr.name} עבר לרשות ${c.name}`); break;}
+        giveItem(c,tr); rs.took[i]=c.name; alog(`${c.name} ${G(c,"לקח","לקחה")}: ${tr.name} (${RREF(room.id)})`); toast(`${tr.name} עבר לרשות ${c.name}`); break;}
       case "untake": ask("לבטל את הסימון?","הסימון יוסר מהחדר. החפץ או הכסף לא יוסרו מהדמות; אם צריך, מורידים אותם ידנית בחנות.","ביטול",()=>{delete rs.took[i]; schedule(); renderQuest();}); return;
       case "roll": {const tb=room.tables[i], r=rollExpr(tb.die); if(!r) return; const row=tb.rows.find(([a,z])=>r.t>=a&&r.t<=z); const msg=`${tb.name}: ${r.t}${row?` · ${row[2]}`:""}`; alog(msg); toast(msg); break;}
       default: return;

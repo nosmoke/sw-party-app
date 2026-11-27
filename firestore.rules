@@ -10,6 +10,9 @@ service cloud.firestore {
     function admin() { return google() && email() == "geilam@gmail.com"; }
     function dmOf(g) { return google() && (g.owner == request.auth.uid || email() in g.get("dms", [])); }
     function changes() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // each game a DM owns sits in one of five slots: dms/{uid}/slots/{1..5}; the manager has no limit
+    function slotOk(n) { return n in ["1", "2", "3", "4", "5"]; }
+    function slotPath(uid, n) { return /databases/$(database)/documents/dms/$(uid)/slots/$(n); }
     function dmsOk() { return request.resource.data.get("dms", []) is list && request.resource.data.get("dms", []).size() <= 10; }
 
     match /games/{code} {
@@ -18,13 +21,20 @@ service cloud.firestore {
       function jsonOk() { return !changes().hasAny(["json"]) || request.resource.data.json == ""; }
       allow get: if signedIn();
       allow list: if admin() || dmOf(resource.data);
-      allow create: if google() && request.resource.data.owner == request.auth.uid && dmsOk() && !("json" in request.resource.data);
+      allow create: if google() && request.resource.data.owner == request.auth.uid && dmsOk() && !("json" in request.resource.data)
+        && (admin() || (slotOk(request.resource.data.get("slot", ""))
+            && !exists(slotPath(request.auth.uid, request.resource.data.slot))
+            && getAfter(slotPath(request.auth.uid, request.resource.data.slot)).data.game == code));
       // anyone in the game saves the shared part; only the owner (or the manager) renames it or changes its DMs
       allow update: if signedIn() && (
         changes().hasOnly(["pj", "savedAt"])
         || (dmOf(resource.data) && changes().hasOnly(["pj", "savedAt", "json"]) && jsonOk())
         || ((admin() || (google() && resource.data.owner == request.auth.uid))
-            && changes().hasOnly(["pj", "savedAt", "json", "name", "dms"]) && jsonOk() && dmsOk()));
+            && changes().hasOnly(["pj", "savedAt", "json", "name", "dms"]) && jsonOk() && dmsOk())
+        // a game made before the slots existed: its owner gives it a free slot, once
+        || (google() && resource.data.owner == request.auth.uid && !("slot" in resource.data) && changes().hasOnly(["slot"])
+            && slotOk(request.resource.data.slot) && !exists(slotPath(request.auth.uid, request.resource.data.slot))
+            && getAfter(slotPath(request.auth.uid, request.resource.data.slot)).data.game == code));
       allow delete: if admin() || (google() && resource.data.owner == request.auth.uid);
       match /por/{cid} {
         allow get, create, update, delete: if signedIn();
@@ -73,6 +83,15 @@ service cloud.firestore {
         && changes().hasOnly(["email", "last", "visits"]) && request.resource.data.email == email();
       allow get: if google() && uid == request.auth.uid;
       allow get, list, delete: if admin();
+      match /slots/{n} {
+        allow get, list: if admin() || (google() && uid == request.auth.uid);
+        allow create: if google() && uid == request.auth.uid && slotOk(n) && request.resource.data.keys().hasOnly(["game"])
+          && getAfter(/databases/$(database)/documents/games/$(request.resource.data.game)).data.owner == request.auth.uid
+          && getAfter(/databases/$(database)/documents/games/$(request.resource.data.game)).data.slot == n;
+        // freed only together with its game
+        allow delete: if admin() || (google() && uid == request.auth.uid
+          && !existsAfter(/databases/$(database)/documents/games/$(resource.data.game)));
+      }
     }
 
     // anonymous visit counting: each device writes its own visits, only the manager reads them

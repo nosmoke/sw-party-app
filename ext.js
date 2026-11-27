@@ -1,7 +1,7 @@
 /* Firebase behind the app's storage calls: anonymous sign-in for everyone, Google sign-in for the manager */
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInAnonymously,GoogleAuthProvider,signInWithPopup,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,doc,collection,getDoc,getDocs,setDoc,updateDoc,deleteDoc,onSnapshot,query,where,orderBy,limit} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,doc,collection,getDoc,getDocs,setDoc,updateDoc,deleteDoc,onSnapshot,query,where,orderBy,limit,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const X=window.SW_EXT, CFG=window.SW_FB||{};
 const fail=()=>{ if(!X.ready){ X.failed=true; X._res(null); } };
@@ -18,7 +18,9 @@ try{
     where:(f,op,v)=>qref(p,[...cons,where(f,op,v)]), orderBy:(f,d)=>qref(p,[...cons,orderBy(f,d||"asc")]), limit:n=>qref(p,[...cons,limit(n)]),
     get:async()=>{ const q=await getDocs(cons.length?query(collection(fs,p),...cons):collection(fs,p)); const docs=q.docs.map(wrapSnap); return {docs,size:docs.length,empty:!docs.length}; }});
   const cref=p=>Object.assign(qref(p,[]),{path:p, doc:id=>dref(id?p+"/"+id:doc(collection(fs,p)).path)});
-  const db={doc:dref,collection:cref};
+  /* several writes that succeed or fail together; the rules see them as one (getAfter / existsAfter) */
+  const batch=()=>{ const b=writeBatch(fs); return {set:(r,d)=>{ b.set(doc(fs,r.path),d); }, update:(r,d)=>{ b.update(doc(fs,r.path),d); }, delete:r=>{ b.delete(doc(fs,r.path)); }, commit:()=>b.commit()}; };
+  const db={doc:dref,collection:cref,batch};
   let user=null;
   X.uid=()=>user?user.uid:"";
   X.email=()=>user&&!user.isAnonymous?(user.email||""):"";
