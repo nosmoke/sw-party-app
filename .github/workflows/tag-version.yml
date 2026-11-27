@@ -29,7 +29,7 @@ jobs:
             notes=$(git show "$sha:index.html" | python3 -c '
           import sys, re, json
           v = sys.argv[1]
-          m = re.search(r"\[\"" + re.escape(v) + r"\",(\"(?:[^\"\\\\]|\\\\.)*\")\]", sys.stdin.read())
+          m = re.search(r"\[\"" + re.escape(v) + r"\",(\"(?:[^\"\\]|\\.)*\")\]", sys.stdin.read())
           print(json.loads(m.group(1)) if m else "גרסה " + v)
           ' "$v")
             gh release create "v$v" --target "$sha" --title "$v" --notes "$notes"
