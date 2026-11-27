@@ -1473,7 +1473,7 @@ async function secEnsure(){
       if(x){ secApply(state,x); normalize(state); saveLocal(); renderAll(); if(location.hash==="#map") renderMap(); }
       SEC_LAST=x?JSON.stringify(x):""; secSaved=sn.data().savedAt||null; }
     else { if(SEC_MIG) secApply(state,SEC_MIG); SEC_LAST=""; }
-    SEC_READY=true; SEC_MIG=null;
+    SEC_READY=true; SEC_MIG=null; libSyncReaders();
     if(!sn.exists||NEED_PJ) schedule();   /* writes the secret part, then the shared part without it */
     if(secStore.onSnapshot&&!secUnsub) secUnsub=secStore.onSnapshot(sn2=>{ try{
       if(!sn2||!sn2.exists||g!==GAME) return; const d=sn2.data(); if(!d||d.savedAt===secSaved||dirty||writing) return;
@@ -1520,7 +1520,7 @@ async function flush(){
     if(EXT){
       if(secStore&&SEC_READY&&gIsDM()){ const x=secOf(state), sj=JSON.stringify(x); if(sj!==SEC_LAST){ secSaved=at; await secStore.set({json:sj,savedAt:at}); SEC_LAST=sj; } }
       const up={pj:stripPor(pubOf(state)),savedAt:at}; if(NEED_PJ&&SEC_READY&&gIsDM()) up.json="";   /* the old all-in-one copy goes once the DM part is saved */
-      await store.update(up); if(up.json==="") NEED_PJ=false;
+      await store.update(up); if(up.json==="") NEED_PJ=false; if(SEC_READY&&gIsDM()) libSyncReaders();
       setSave("נשמר במשחק, זמין לכל המחוברים אליו"); }
     else { await store.set({json:stripPor(state),savedAt:at}); setSave("נשמר בחשבון שלך, זמין מכל מכשיר"); } }
   catch(e){setSave(EXT?"השמירה למשחק נכשלה, נשמר במכשיר הזה":"השמירה לחשבון נכשלה, נשמר במכשיר הזה");}
@@ -1551,7 +1551,7 @@ async function connect(){
     /* live: when the same account saves from another device (the DM's screen), apply it here */
     if(store.onSnapshot&&!unsub) unsub=store.onSnapshot(snap=>{ try{
       if(!snap||!snap.exists){ if(EXT&&GAME===want&&snap&&!(snap.metadata&&snap.metadata.fromCache)){ toast("המנחה מחקה את המשחק הזה"); switchGame(null); } return; }
-      const d=snap.data(); if(EXT&&d){ const was=GMETA?JSON.stringify(GMETA.dms):""; GMETA=gmMeta(d); if(MODE==="dm"&&!gIsDM()){ setMode("player"); } secEnsure();
+      const d=snap.data(); if(EXT&&d){ const was=GMETA?JSON.stringify(GMETA.dms):""; GMETA=gmMeta(d); if(MODE==="dm"&&!gIsDM()){ setMode("player"); } if(!gIsDM()&&(SEC_READY||secUnsub)) secReset(); secEnsure(); libSyncReaders();
         if(was!==JSON.stringify(GMETA.dms)&&gGoogle()){ MYLIST=null; if(!$("backupPanel").hidden&&!document.activeElement.closest("#gmSec")) renderGame(); } } if(!d||d.savedAt===lastSaved) return;
       if(dirty||writing) return; let remote=null; if(EXT) remote=gDocState(d); else try{remote=JSON.parse(d.json);}catch(e){} if(!valid(remote)) return;
       const keep=state.current, prev=state, sx=SEC_READY?secOf(prev):null; state=normalize(sx?secApply(remote,sx):remote); if(state.chars.some(c=>c.id===keep)) state.current=keep;   /* each device keeps its own selected character */
@@ -1729,7 +1729,7 @@ function renderGame(){
   const ci=$("gmCodeIn"); if(ci){ ci.onkeydown=e=>{ if(e.key==="Enter") gmJoin(ci.value); };
     ci.oninput=()=>{ const d=ci.value.replace(/\D/g,"").slice(0,10); const v=d.length>5?d.slice(0,5)+"-"+d.slice(5):d; if(v!==ci.value){ ci.value=v; ci.setSelectionRange(v.length,v.length); } }; }
   on("gmGoogle",gSignIn);
-  on("gmSignOut",async()=>{ try{ await EXT.signOutGoogle(); }catch(e){} GLIST=null; MYLIST=null; STATS=null; renderGame(); });
+  on("gmSignOut",async()=>{ visitTouch(true); try{ await EXT.signOutGoogle(); }catch(e){} GLIST=null; MYLIST=null; STATS=null; renderGame(); });
   on("gmCreateBtn",gmCreate); on("gmRefresh",gmLoadList);
   on("gmDmAdd",()=>{ const v=String($("gmDmIn").value||"").trim().toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ ADDERR="זו לא כתובת אימייל תקינה"; renderGame(); return; }
@@ -1761,12 +1761,15 @@ function renderSetTabs(){
   $("backupPanel").querySelectorAll("[data-tab]").forEach(e=>e.classList.toggle("on",e.dataset.tab===SET_TAB));
 }
 async function gSignIn(){
+  visitTouch(true);
   try{ await EXT.signInGoogle(); }
   catch(e){ const er=$("gmErr")||$("modeErr"); if(er) er.textContent="הכניסה עם Google לא הושלמה"; }
 }
 if(EXT&&EXT.onAuth) EXT.onAuth(()=>{
+  visitHandoff();
   GLIST=null; MYLIST=null; STATS=null; DMS=null; LIB=null; QINDEX=null; for(const k in QBOOKS) if(QBOOKS[k]._pub) delete QBOOKS[k]; dmTouch();
   if(MODE==="dm"&&GAME&&!gIsDM()) setMode("player");
+  if(GAME&&!gIsDM()&&(SEC_READY||secUnsub)) secReset();
   secEnsure();
   if(MG_OPEN&&MODE==="player"&&GAME) modeGame();   /* the dialog follows the account: into DM mode, or says this account is not a DM */
   renderGame(); renderModeBtn();
@@ -1818,8 +1821,16 @@ async function logVisit(){
   const kind=/iPad|Tablet/i.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)?"טאבלט":/Mobi|Android|iPhone/i.test(ua)?"טלפון":"מחשב";
   const br=/Edg\//.test(ua)?"Edge":/SamsungBrowser/.test(ua)?"Samsung":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":"אחר";
   const now=new Date().toISOString();
-  VISIT={ref:dbRef.collection("visits").doc(),last:Date.now(),uid:EXT.uid()};
+  VISIT={ref:dbRef.collection("visits").doc(),last:Date.now(),uid:EXT.uid(),t:now,kind,br};
   try{ await VISIT.ref.set({t:now,end:now,dev:DEV_ID,uid:EXT.uid(),game:GAME||"",mode:MODE,kind,br,email:gEmail()}); }catch(e){ VISIT.dead=true; }
+}
+/* signing in with Google (or out) swaps this device's account, and a visit can only be updated by the account that opened it:
+   the visit goes on in a new record that keeps the start time and points back at the old one (prev); the stats count them once */
+async function visitHandoff(){
+  if(!EXT||!dbRef||!VISIT||VISIT.dead||VISIT.uid===EXT.uid()) return;
+  const old=VISIT, now=new Date().toISOString();
+  VISIT={ref:dbRef.collection("visits").doc(),last:Date.now(),uid:EXT.uid(),t:old.t,kind:old.kind,br:old.br};
+  try{ await VISIT.ref.set({t:old.t,end:now,dev:DEV_ID,uid:EXT.uid(),game:GAME||"",mode:MODE,kind:old.kind,br:old.br,email:gEmail(),prev:old.ref.id}); }catch(e){ VISIT.dead=true; }
 }
 function visitTouch(force){
   if(!VISIT||VISIT.dead||VISIT.uid!==EXT.uid()) return;
@@ -1832,7 +1843,8 @@ async function statsLoad(){
   try{
     const since=new Date(Date.now()-30*864e5).toISOString();
     const q=await dbRef.collection("visits").where("t",">=",since).orderBy("t","desc").limit(2000).get();
-    STATS=q.docs.map(d=>Object.assign({id:d.id},d.data()));
+    const all=q.docs.map(d=>Object.assign({id:d.id},d.data())), cont=new Set(all.map(v=>v.prev).filter(Boolean));
+    STATS=all.filter(v=>!cont.has(v.id));
     /* tidy: visits older than 90 days are deleted, a few hundred at a time */
     const old=await dbRef.collection("visits").where("t","<",new Date(Date.now()-90*864e5).toISOString()).limit(300).get();
     for(const d of old.docs) dbRef.doc("visits/"+d.id).delete().catch(()=>{});
@@ -2693,7 +2705,7 @@ function modeGame(){
   const g=gGoogle();
   modeDlg("מעבר למצב מנחה",g?`<p>החשבון <b style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</b> אינו מנחה במשחק הזה.</p><p class="muted small">בעלי המשחק יכולים להוסיף אותו ב״הגדרות״ ← ״מנחי המשחק״. אפשר גם להיכנס עם חשבון Google אחר.</p>`
       :`<p>במשחק הזה מצב מנחה פתוח רק למנחים שמחוברים עם חשבון Google.</p>`,
-    [[g?"החלפת חשבון Google":"כניסה עם Google","primary",async()=>{ if(g){ try{ await EXT.signOutGoogle(); }catch(e){} } gSignIn(); }],["ביטול","",modeClose]]);
+    [[g?"החלפת חשבון Google":"כניסה עם Google","primary",async()=>{ if(g){ visitTouch(true); try{ await EXT.signOutGoogle(); }catch(e){} } gSignIn(); }],["ביטול","",modeClose]]);
   MG_OPEN=true;
 }
 function pwChange(){
@@ -4591,7 +4603,8 @@ async function libQuery(){
   const row=d=>Object.assign({id:d.id},d.data()), m=new Map();
   if(EXT.isAdmin()) for(const d of (await dbRef.collection("books").get()).docs) m.set(d.id,row(d));
   else { for(const d of (await dbRef.collection("books").where("everyone","==",true).get()).docs) m.set(d.id,row(d));
-    for(const d of (await dbRef.collection("books").where("owner","==",EXT.uid()).get()).docs) m.set(d.id,row(d)); }
+    for(const d of (await dbRef.collection("books").where("owner","==",EXT.uid()).get()).docs) m.set(d.id,row(d));
+    try{ for(const d of (await dbRef.collection("books").where("readers","array-contains",gEmail()).get()).docs) m.set(d.id,row(d)); }catch(e){} }
   return [...m.values()].sort((a,b)=>String(a.title).localeCompare(String(b.title),"he"));
 }
 async function qLoadIndex(){
@@ -4647,7 +4660,7 @@ async function libPut(entry,everyone,say){
   const at=new Date().toISOString();
   const meta={title:String(book.title).slice(0,80),source:String(book.source||"").slice(0,120),levels:String(book.levels||"").slice(0,40),
     owner:old?old.owner:EXT.uid(),ownerEmail:old?old.ownerEmail:gEmail(),everyone:old?!!old.everyone:!!(everyone&&EXT.isAdmin()),
-    ready:false,savedAt:at,pub:JSON.stringify(pub),imgs:Object.values(key)};
+    ready:false,savedAt:at,pub:JSON.stringify(pub),imgs:Object.values(key),rg:(old&&old.rg)||{},readers:(old&&old.readers)||[]};
   await dbRef.doc("books/"+id).set(meta);
   let n=0; for(const [path,k] of Object.entries(key)){ say(`${book.title}: תמונה ${++n} מתוך ${Object.keys(key).length}`);
     const d=await libFitImg(String(images[path]||"")); if(!d) throw new Error("תמונה גדולה מדי: "+path);
@@ -4655,6 +4668,23 @@ async function libPut(entry,everyone,say){
   await dbRef.doc("books/"+id+"/dm/book").set({json:JSON.stringify(dmb),savedAt:at});
   await dbRef.doc("books/"+id).update({ready:true});
   delete QBOOKS[id]; return book.title;
+}
+/* a private book that a game uses opens to that game's DMs (its owner and co-DMs): the book's owner keeps,
+   per game, the list of those DMs (rg), and readers is all of them together — the rules read it */
+let LIB_SYNC="";
+async function libSyncReaders(){
+  if(!LIB_ON()||!GAME||!GMETA||!gGoogle()||!gIsDM()) return;
+  const q=state.quest||{}, ids=[...new Set([q.active,...Object.keys(q.by||{})].filter(Boolean))];
+  const want=[...new Set([GMETA.ownerEmail,...(GMETA.dms||[])].map(x=>String(x||"").toLowerCase()).filter(x=>x&&x!==gEmail()))].sort();
+  const sig=GAME+"|"+ids.join(",")+"|"+want.join(","); if(sig===LIB_SYNC) return; LIB_SYNC=sig;
+  for(const id of ids){
+    try{ const ref=dbRef.doc("books/"+id), sn=await ref.get(); if(!sn.exists) continue; const b=sn.data();
+      if(b.owner!==EXT.uid()||b.everyone) continue;
+      const rg=Object.assign({},b.rg||{}); if(JSON.stringify((rg[GAME]||[]).slice().sort())===JSON.stringify(want)) continue;
+      if(want.length) rg[GAME]=want; else delete rg[GAME];
+      await ref.update({rg,readers:[...new Set(Object.values(rg).flat())].slice(0,200)});
+    }catch(e){ console.warn("book sharing",e); LIB_SYNC=""; }
+  }
 }
 async function libUpload(file){
   const ev=$("libEvery"), every=!!(ev&&ev.checked), say=t=>{ LIB_BUSY=t; libPaint(); };
@@ -4685,7 +4715,8 @@ function libPaint(){
   else h+=`<ul class="gm-list">${LIB.map(b=>{ const mine=b.owner===EXT.uid();
     return `<li><div class="gm-meta"><b>${esc(b.title||b.id)}</b>${b.ready?"":` <span class="tag">העלאה לא הושלמה</span>`}
       <div class="muted small">${esc(b.source||"")}${admin&&!mine?` · הועלתה על ידי <bdi>${esc(b.ownerEmail||"")}</bdi>`:""}</div>
-      ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":"רק שלך"}</div>`}</div>
+      ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":mine?"רק שלך":"פתוחה לך דרך משחק שלך"}</div>`}
+      ${!b.everyone&&(b.readers||[]).length&&(mine||admin)?`<div class="muted small">פתוחה גם למנחים במשחקים שמשתמשים בה: ${(b.readers||[]).map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""}</div>
       ${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</li>`; }).join("")}</ul>`;
   h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json" hidden ${LIB_BUSY?"disabled":""}>
     ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>

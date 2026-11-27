@@ -41,9 +41,11 @@ service cloud.firestore {
     match /books/{id} {
       function book() { return get(/databases/$(database)/documents/books/$(id)).data; }
       function mine() { return admin() || (google() && book().owner == request.auth.uid); }
-      function canRead() { return mine() || (google() && book().everyone == true); }
+      // readers: the DMs of games that use this private book, kept by the book's owner
+      function canRead() { return mine() || (google() && (book().everyone == true || email() in book().get("readers", []))); }
       allow get: if signedIn();
-      allow list: if admin() || (google() && (resource.data.everyone == true || resource.data.owner == request.auth.uid));
+      allow list: if admin() || (google() && (resource.data.everyone == true || resource.data.owner == request.auth.uid
+        || email() in resource.data.get("readers", [])));
       allow create: if google() && request.resource.data.owner == request.auth.uid && (admin() || request.resource.data.everyone == false);
       allow update: if (admin() || (google() && resource.data.owner == request.auth.uid))
         && request.resource.data.owner == resource.data.owner
@@ -76,7 +78,7 @@ service cloud.firestore {
     // anonymous visit counting: each device writes its own visits, only the manager reads them
     match /visits/{id} {
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(["t", "end", "dev", "uid", "game", "mode", "kind", "br", "email"])
+        && request.resource.data.keys().hasOnly(["t", "end", "dev", "uid", "game", "mode", "kind", "br", "email", "prev"])
         && (request.resource.data.email == "" || (google() && request.resource.data.email == email()));
       allow update: if signedIn() && resource.data.uid == request.auth.uid
         && changes().hasOnly(["end", "game", "mode"]);
