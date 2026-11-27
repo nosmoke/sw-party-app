@@ -1800,6 +1800,8 @@ const ROLL_M={
   best3:{n:"שיטה III",t:"4ק6, שלוש הגבוהות",d:"במקום 3ק6, מגלגלים 4ק6 ומחברים את שלוש הקוביות הגבוהות.",src:"מ 32",sets:1,dice:4},
   points:{n:"שיטה II",t:"חלוקת נקודות",d:"מחלקים מאגר נקודות בין 6 התכונות. כל תכונה לפחות 3 ולכל היותר 18. מומלץ 66 (לא פחות מ־54 ולא יותר מ־72).",src:"מ 32"}
 };
+/* "שיטה III: 4ק6": the Latin numeral pulls the dice next to it into a left-to-right run, so the name is isolated and a right-to-left mark follows it */
+const rlName=m=>"\u2068"+m.n+"\u2069\u200F: "+m.t;
 let RL=null;   /* the window's working state: {m, nsets, pool, set, asg:{str:index}, pts:{str:n}} */
 const d6=()=>{ const a=new Uint32Array(1); let x; do{ crypto.getRandomValues(a); x=a[0]; }while(x>=4294967292); return 1+x%6; };
 function rollSets(m,n){
@@ -1828,7 +1830,7 @@ function rollRender(anim){
   const P=PROG[c.cls], PRIME=P&&P.prime?P.prime:[];
   const primeNote=P?`<p class="small rl-prn">★ ${PRIME.length>1?"התכונות העיקריות":"התכונה העיקרית"} של ${esc(cname(c))}: <b>${PRIME.map(k=>ABIL.find(a=>a[0]===k)[1]).join(" ו")}</b>. ${PRIME.length>1?"ערך של 13 ומעלה בכולן":"ערך של 13 ומעלה"} נותן ‎+5% לנק״ן${P.src?` (${esc(P.src.split(" · ")[0])})`:""}.</p>`:`<p class="muted small">בחרו קודם סוג דמות, כדי לראות כאן את התכונות העיקריות שלו.</p>`;
   const dieHTML=x=>`<span class="rl-v" title="${x.d.join(" + ")}">${x.v}</span><span class="rl-d">${x.d.map((v,i)=>i===x.drop?`<s>${v}</s>`:v).join(" ")}</span>`;
-  let h=`<fieldset class="rl-ms"><legend>שיטה</legend>${Object.entries(ROLL_M).map(([k,m])=>`<label class="rl-m"><input type="radio" name="rlm" value="${k}" ${RL.m===k?"checked":""}><span><b><bdi>${m.n}</bdi>: ${m.t}</b> <small class="muted">(${m.src})</small></span></label>`).join("")}</fieldset>
+  let h=`<fieldset class="rl-ms"><legend>שיטה</legend>${Object.entries(ROLL_M).map(([k,m])=>`<label class="rl-m"><input type="radio" name="rlm" value="${k}" ${RL.m===k?"checked":""}><span><b>${rlName(m)}</b> <small class="muted">(${m.src})</small></span></label>`).join("")}</fieldset>
     <p class="small">${M.d}</p>`;
   if(RL.m==="multi") h+=`<div class="gm-row"><label for="rlN">מספר סטים</label><select id="rlN">${[3,4,5,6].map(n=>`<option ${n===RL.nsets?"selected":""}>${n}</option>`).join("")}</select></div>`;
   if(RL.m==="points"){
@@ -1984,7 +1986,7 @@ function genOpen(){
   GEN={cls:"",method:"house",sex:"",gear:true,c:null};
   $("genBody").innerHTML=`<div class="gen-f">
     <label>סוג דמות<select id="genCls"><option value="">אקראי</option>${CLASS_GROUPS.map(([g,ids])=>`<optgroup label="${esc(g)}">${ids.map(id=>`<option value="${id}">${esc(CLASSES[id].name)}</option>`).join("")}</optgroup>`).join("")}</select></label>
-    <label>גלגול תכונות<select id="genM">${Object.entries(ROLL_M).map(([k,m])=>`<option value="${k}" ${k==="house"?"selected":""}>${esc(m.n+": "+m.t)}</option>`).join("")}</select></label>
+    <label>גלגול תכונות<select id="genM">${Object.entries(ROLL_M).map(([k,m])=>`<option value="${k}" ${k==="house"?"selected":""}>${esc(rlName(m))}</option>`).join("")}</select></label>
     <label>מין<select id="genSex"><option value="">אקראי</option><option value="m">זכר</option><option value="f">נקבה</option></select></label>
     <label class="gen-ck"><input type="checkbox" id="genGear" checked> לקנות ציוד</label></div>
     <div class="gm-row"><button class="btn primary" id="genGo">🎲 הגרלה</button></div><div id="genOut"></div>`;
