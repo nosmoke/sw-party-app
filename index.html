@@ -5011,7 +5011,8 @@ async function libDownload(id){
     for(const k of keys){ const ck=id+"/"+k; let d=IMG_CACHE[ck];
       if(!d){ const sn=await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).get(); d=sn.exists?sn.data().data:""; }
       if(!d) continue;
-      const name="img:"+k===M.file?`${id}-map`:"img:"+k===P.file?`${id}-map-players`:`${id}-${k}`;
+      const pt=(P.patches||[]).find(x=>x.file==="img:"+k);
+      const name="img:"+k===M.file?`${id}-map`:"img:"+k===P.file?`${id}-map-players`:pt&&pt.room!=null?`${id}-room${pt.room}`:`${id}-${k}`;
       path[k]=`books/${name}.${ext(d)}`; images[path[k]]=d; }
     const book=JSON.parse(JSON.stringify(raw),(kk,v)=>typeof v==="string"&&/^img:[pd]\d+$/.test(v)?(path[v.slice(4)]||""):v);
     const blob=new Blob([JSON.stringify({format:"sw-adventure",version:1,books:[{book,images}]})],{type:"application/json"});
