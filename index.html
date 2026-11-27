@@ -4600,7 +4600,7 @@ function roomSt(bid,rid){const s=qs(bid); if(!s.rooms[rid]) s.rooms[rid]={st:"",
 const QRAW={}, QMETA={};
 let ED=null;
 const canEditBook=id=>!!(LIB_ON()&&gGoogle()&&QRAW[id]&&QMETA[id]&&(EXT.isAdmin()||QMETA[id].owner===EXT.uid()));
-const ED_MON=[["name","שם","t"],["count","מספר","n"],["hd","קב״פ","t"],["hp","נק״פ קבועות","n"],["ac","דרג״ש","n"],["atk","התקפה","t"],["save","הצלה","n"],["move","תנועה","t"],["xp","נק״ן","n"],["special","מיוחד","a"]];
+const ED_MON=[["name","שם","t"],["count","כמות","n"],["hd","קב״פ","t"],["hp","נק״פ קבועות","n"],["ac","דרג״ש","n"],["atk","התקפה","t"],["save","הצלה","n"],["move","תנועה","t"],["xp","נק״ן","n"],["special","מיוחד","a"]];
 const ED_TRAP=[["name","שם","t"],["dmg","נזק (למשל 1ק6)","t"],["text","תיאור","a"]];
 const ED_TRE=[["name","שם","t"],["gp","שווי לחלוקה במ״ז","n"],["qty","כמות","n"],["text","תיאור","a"]];
 async function edOpen(id,mode,sel){
@@ -4710,6 +4710,16 @@ async function edSave(raw){
   await dbRef.doc("books/"+id).update(up); Object.assign(QMETA[id],up);
   QRAW[id]=raw; const nb=await libImgs(id,JSON.parse(JSON.stringify(raw))); nb.id=id; QBOOKS[id]=nb; QINDEX=null; LIB=null;
 }
+
+/* ---------- arrows page through the rooms while browsing a book, like the ‹ › buttons (right-to-left: → is the previous room) ---------- */
+document.addEventListener("keydown",e=>{
+  if((e.key!=="ArrowRight"&&e.key!=="ArrowLeft")||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||e.defaultPrevented) return;
+  if(!ED||ED.edit||ED.mode!=="browse"||!$("bkEd")) return;
+  const sc=$("scrim"); if(sc&&!sc.hidden) return;
+  const t=e.target; if(t&&t.closest&&t.closest("input,textarea,select,[contenteditable]")) return;
+  const btn=$("bkEd").querySelector(`[data-ed="${e.key==="ArrowRight"?"prev":"next"}"]`); if(!btn) return;
+  e.preventDefault(); btn.click();
+});
 
 /* ---------- ESC closes the window on top, one per press: a question first, then dialogs, the book editor, "what's new", settings ---------- */
 document.addEventListener("keydown",e=>{
