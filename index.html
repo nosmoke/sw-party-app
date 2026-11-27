@@ -241,6 +241,14 @@ body.ext .not-ext{display:none}
 .gm-list li.on{border-color:var(--accent)}
 .gm-list .gm-meta{flex:1 1 220px;min-width:0}
 .gm-list .gm-acts{display:flex;gap:6px}
+.gm-acct{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.st-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-top:6px}
+.st-tile{border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+.st-tile b{font-size:1.25rem;line-height:1.1}.st-tile span{font-size:.8rem;color:var(--muted)}
+.st-days{display:grid;gap:3px}.st-day{display:grid;grid-template-columns:9.5em minmax(0,1fr) 4.5em;gap:8px;align-items:center;font-size:.82rem}
+.st-bar{height:10px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden}.st-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.st-n{font-variant-numeric:tabular-nums;text-align:start}
+.app.player #gmStats{display:none}
 .btn.mode{font-weight:600}.app.dm .btn.mode{border-color:var(--accent);color:var(--accent)}
 .frozen-note{margin:0;padding:8px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);font-size:.9rem}
 .frozen-note[hidden]{display:none}
@@ -1426,6 +1434,7 @@ async function connect(){
     if(!db||!user){setSave("נשמר במכשיר הזה בלבד. התחברו ל־Claude כדי לשמור בין מכשירים");return;}
     const id=await user.id(); if(!id){setSave("נשמר במכשיר הזה בלבד");return;}
     dbRef=db; uidRef=id;
+    if(EXT) logVisit();
     if(EXT&&!GAME){ setSave("לא מחובר למשחק: נשמר במכשיר הזה בלבד"); renderGame(); return; }
     const want=GAME; store=EXT?db.doc("games/"+GAME):db.doc("data/users/"+id+"/shop");
     const timer=setTimeout(()=>setSave("החשבון לא עונה כרגע; העבודה נשמרת במכשיר הזה"),10000);
@@ -1435,14 +1444,15 @@ async function connect(){
     if(snap.exists){
       let remote=null; try{remote=JSON.parse(snap.data().json);}catch(e){}
       if(valid(remote)&&!dirty){const prev=state; state=normalize(remote);saveLocal();renderAll(); await pullPortraits(prev);}
-      if(EXT) GMETA=gmMeta(snap.data());
+      if(EXT){ GMETA=gmMeta(snap.data()); renderModeBtn(); }
       setSave(EXT?"מחובר למשחק: השינויים נשמרים לכל המחוברים":"נשמר בחשבון שלך, זמין מכל מכשיר");
     }else await flush();
     renderGame();
     /* live: when the same account saves from another device (the DM's screen), apply it here */
     if(store.onSnapshot&&!unsub) unsub=store.onSnapshot(snap=>{ try{
       if(!snap||!snap.exists){ if(EXT&&GAME===want&&snap&&!(snap.metadata&&snap.metadata.fromCache)){ toast("המנחה מחקה את המשחק הזה"); switchGame(null); } return; }
-      const d=snap.data(); if(EXT&&d){ GMETA=gmMeta(d); } if(!d||d.savedAt===lastSaved) return;
+      const d=snap.data(); if(EXT&&d){ const was=GMETA?JSON.stringify(GMETA.dms):""; GMETA=gmMeta(d); if(MODE==="dm"&&!gIsDM()){ setMode("player"); }
+        if(was!==JSON.stringify(GMETA.dms)&&gGoogle()){ MYLIST=null; if(!$("backupPanel").hidden&&!document.activeElement.closest("#gmSec")) renderGame(); } } if(!d||d.savedAt===lastSaved) return;
       if(dirty||writing) return; let remote=null; try{remote=JSON.parse(d.json);}catch(e){} if(!valid(remote)) return;
       const keep=state.current, prev=state; state=normalize(remote); if(state.chars.some(c=>c.id===keep)) state.current=keep;   /* each device keeps its own selected character */
       for(const c of state.chars){ const o=prev.chars.find(x=>x.id===c.id); if(o&&o.portrait&&o.porV===c.porV) c.portrait=o.portrait; }
@@ -1455,7 +1465,14 @@ async function connect(){
 let GMETA=null, GLIST=null, GBUSY=false;
 const fmtCode=c=>String(c||"").replace(/^(\d{5})(\d{5})$/,"$1 $2");
 const isoCode=c=>"\u2066"+fmtCode(c)+"\u2069";   /* keeps the two halves in order inside Hebrew text */
-const gmMeta=d=>({name:(d&&d.name)||"",created:(d&&d.created)||"",owner:(d&&d.owner)||""});
+const gmMeta=d=>({name:(d&&d.name)||"",created:(d&&d.created)||"",owner:(d&&d.owner)||"",ownerEmail:(d&&d.ownerEmail)||"",dms:Array.isArray(d&&d.dms)?d.dms:[]});
+/* hosted games: DM mode belongs to the Google accounts the game lists (its owner and co-DMs); the manager counts everywhere */
+const gGoogle=()=>!!(EXT&&EXT.isGoogle&&EXT.isGoogle());
+const gEmail=()=>gGoogle()?String(EXT.email()||"").toLowerCase():"";
+const gOwner=()=>!!(GAME&&GMETA&&gGoogle()&&(GMETA.owner===EXT.uid()||EXT.isAdmin()));
+const gIsDM=()=>!!(GAME&&GMETA&&gGoogle()&&(EXT.isAdmin()||GMETA.owner===EXT.uid()||GMETA.dms.map(x=>String(x).toLowerCase()).includes(gEmail())));
+const GAME_LIMIT=5;   /* games one DM may own; the manager has no limit */
+let MYLIST=null, STATS=null, ADDERR="";
 function sampleState(){
   const ex=newChar("דוגמה: פייטן"); ex.cls="bard"; ex.money=110; ex.str=11; const st={current:ex.id,chars:[ex]};
   for(const [id,q] of KITS_MINE[2].items) ex.cart.push({key:uid(),ref:id,name:BY[id].name,p:BY[id].p,w:BY[id].w||0,qty:q||1,ride:false,meta:BY[id].meta});
@@ -1495,8 +1512,8 @@ function gmLeave(){
 function gmReset(){
   if(MODE!=="dm") return;
   if(!GAME) return resetAll();
-  ask("לאפס את המשחק?",`כל הנתונים של המשחק ${GMETA&&GMETA.name?"\""+GMETA.name+"\" ":""}יימחקו לכל המחוברים: הדמויות, האיורים, מעקב ההרפתקה, ספר ההרפתקה וסיסמת המנחה (תחזור ל־${PW_DEFAULT}). הקוד נשאר אותו קוד. כדאי לשמור גיבוי לפני כן.`,"איפוס המשחק",()=>{
-    state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); toast("המשחק אופס. סיסמת המנחה חזרה ל־"+PW_DEFAULT);
+  ask("לאפס את המשחק?",`כל הנתונים של המשחק ${GMETA&&GMETA.name?"\""+GMETA.name+"\" ":""}יימחקו לכל המחוברים: הדמויות, האיורים, מעקב ההרפתקה, וספר ההרפתקה. הקוד, הבעלים ורשימת המנחים נשארים. כדאי לשמור גיבוי לפני כן.`,"איפוס המשחק",()=>{
+    state=blankState(); schedule(); renderAll(); if(location.hash==="#map") renderMap(); toast("המשחק אופס");
   });
 }
 /* reset everything outside a hosted game: this device's party, or (inside Claude) the account's party */
@@ -1508,7 +1525,8 @@ function resetAll(){
 }
 async function gmCreate(){
   const name=($("gmNewName").value||"").trim().slice(0,40), copy=$("gmNewCopy").checked, err=t=>{ $("gmErr").textContent=t; };
-  if(!EXT.isAdmin()){ err("רק המנהל המחובר עם Google יכול ליצור משחק"); return; }
+  if(!gGoogle()){ err("כדי ליצור משחק צריך להיכנס עם Google"); return; }
+  if(!EXT.isAdmin()&&Array.isArray(MYLIST)&&MYLIST.filter(g=>g.owner===EXT.uid()).length>=GAME_LIMIT){ err("הגעת למגבלה של "+GAME_LIMIT+" משחקים"); return; }
   GBUSY=true; renderGame();
   try{
     let code=null; for(let i=0;i<5&&!code;i++){ const c=newCode(); const sn=await dbRef.doc("games/"+c).get(); if(!sn.exists) code=c; }
@@ -1517,18 +1535,23 @@ async function gmCreate(){
     if(copy){ for(const c of state.chars){ const s2=st.chars.find(x=>x.id===c.id); if(c.portrait){ const v=c.porV||Date.now().toString(36)+c.id.slice(-3); s2.porV=v; s2.portrait=c.portrait;
         await dbRef.doc("games/"+code+"/por/"+c.id).set({img:c.portrait,v,savedAt:new Date().toISOString()}); } } }
     const at=new Date().toISOString();
-    await dbRef.doc("games/"+code).set({json:stripPor(st),savedAt:at,created:at,name:name||("משחק "+fmtCode(code)),owner:EXT.uid(),ownerEmail:EXT.email()||""});
+    await dbRef.doc("games/"+code).set({json:stripPor(st),savedAt:at,created:at,name:name||("משחק "+fmtCode(code)),owner:EXT.uid(),ownerEmail:gEmail(),dms:[gEmail()]});
     try{ localStorage.setItem("sw-game-"+code,JSON.stringify(st)); }catch(e){ try{ localStorage.setItem("sw-game-"+code,stripPor(st)); }catch(e2){} }
-    GBUSY=false; GLIST=null; await switchGame(code); MODE="dm"; applyView(); renderAll(); renderGame();
+    GBUSY=false; GLIST=null; MYLIST=null; await switchGame(code); MODE="dm"; applyView(); renderAll(); renderGame(); renderModeBtn();
     toast("נוצר משחק חדש. הקוד: "+isoCode(code));
   }catch(e){ GBUSY=false; renderGame(); err("יצירת המשחק נכשלה. נסו שוב"); }
 }
 async function gmLoadList(){
-  if(!EXT||!EXT.isAdmin()||!dbRef) return; GLIST="loading"; renderGame();
-  try{ const q=await dbRef.collection("games").get();
-    GLIST=q.docs.map(d=>{ const x=d.data()||{}; let names=[]; try{ names=JSON.parse(x.json).chars.map(c=>c.name); }catch(e){}
-      return {code:d.id,name:x.name||"",created:x.created||"",savedAt:x.savedAt||"",names}; }).sort((a,b)=>String(b.savedAt).localeCompare(String(a.savedAt)));
-  }catch(e){ GLIST="error"; }
+  if(!EXT||!dbRef||!gGoogle()) return;
+  const row=d=>{ const x=d.data()||{}; let names=[]; try{ names=JSON.parse(x.json).chars.map(c=>c.name); }catch(e){}
+    return {code:d.id,name:x.name||"",created:x.created||"",savedAt:x.savedAt||"",names,owner:x.owner||"",ownerEmail:x.ownerEmail||"",dms:Array.isArray(x.dms)?x.dms:[]}; };
+  const sort=a=>a.sort((p,q)=>String(q.savedAt).localeCompare(String(p.savedAt)));
+  if(EXT.isAdmin()){ GLIST="loading"; renderGame();
+    try{ GLIST=sort((await dbRef.collection("games").get()).docs.map(row)); }catch(e){ GLIST="error"; } }
+  else { MYLIST="loading"; renderGame();
+    try{ const a=(await dbRef.collection("games").where("owner","==",EXT.uid()).get()).docs.map(row);
+      const b=(await dbRef.collection("games").where("dms","array-contains",gEmail()).get()).docs.map(row);
+      const m=new Map(); for(const g of [...a,...b]) m.set(g.code,g); MYLIST=sort([...m.values()]); }catch(e){ MYLIST="error"; } }
   renderGame();
 }
 function gmDelete(code,name){
@@ -1537,62 +1560,152 @@ function gmDelete(code,name){
       await dbRef.doc("games/"+code).delete(); try{ localStorage.removeItem("sw-game-"+code); }catch(e){}
       toast("המשחק נמחק"); if(code===GAME) await switchGame(null); }
     catch(e){ toast("המחיקה נכשלה"); }
-    gmLoadList();
+    GLIST=null; MYLIST=null; gmLoadList();
   });
 }
 const gmDate=t=>{ if(!t) return ""; const d=new Date(t); return isNaN(d)?"":d.toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"}); };
+async function gmSetDms(list){
+  if(!gOwner()) return;
+  try{ await store.update({dms:list}); GMETA.dms=list; ADDERR=""; toast("רשימת המנחים עודכנה"); }catch(e){ ADDERR="העדכון נכשל. נסו שוב"; }
+  renderGame();
+}
+function gameRows(list,admin){
+  return list.length?`<ul class="gm-list">${list.map(g=>{ const mine=admin||g.owner===EXT.uid();
+    return `<li class="${g.code===GAME?"on":""}"><div class="gm-meta"><b>${esc(g.name||"ללא שם")}</b> · <span class="gm-code">${esc(fmtCode(g.code))}</span>
+      <div class="muted small">${g.names.length===1?"דמות אחת":g.names.length+" דמויות"}${g.names.length?": "+esc(g.names.join(", ")):""}${g.savedAt?" · נשמר "+esc(gmDate(g.savedAt)):""}${admin&&g.ownerEmail?" · בעלים: "+esc(g.ownerEmail):(!admin&&!mine?" · מנחה נוספ/ת":"")}</div></div>
+      <div class="gm-acts">${g.code===GAME?`<span class="small">המשחק הנוכחי</span>`:`<button class="btn small" data-gj="${esc(g.code)}">התחברות</button>`}${mine?`<button class="btn small" data-gd="${esc(g.code)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`
+    :`<p class="muted small">אין עדיין משחקים.</p>`;
+}
 function renderGame(){
   const box=$("gmSec"); if(!box||!EXT) return;
-  const admin=EXT.ready&&EXT.isAdmin&&EXT.isAdmin(), online=!!dbRef, dm=MODE==="dm";
+  const admin=EXT.isAdmin&&EXT.isAdmin(), google=gGoogle(), online=!!dbRef, dm=MODE==="dm";
   let h=`<h3>משחק</h3>`;
   if(!online) h+=`<p class="muted small">${EXT.failed?"אין חיבור לשרת המשחקים. בדקו את האינטרנט ורעננו את הדף.":"מתחבר לשרת המשחקים…"}</p>`;
   if(GAME){
     h+=`<div class="gm-row"><span>מחובר למשחק <b>${esc((GMETA&&GMETA.name)||"")}</b></span><span>קוד: <span class="gm-code">${esc(fmtCode(GAME))}</span></span>
       <button class="btn small" id="gmCopy">העתקת הקוד</button><button class="btn small" id="gmLeaveBtn">התנתקות מהמשחק</button></div>
-      <p class="muted small">כל מי שמכניס את הקוד הזה ב״הגדרות״ מתחבר לאותו משחק, מכל מכשיר ובלי חשבון. השינויים נשמרים לכולם.</p>`;
+      <p class="muted small">כל מי שמכניס את הקוד הזה ב״הגדרות״ מתחבר לאותו משחק, מכל מכשיר ובלי חשבון. השינויים נשמרים לכולם. מצב מנחה פתוח רק למנחי המשחק, אחרי כניסה עם Google.</p>`;
     if(dm) h+=`<div class="gm-row"><button class="btn small" id="gmResetBtn">איפוס המשחק</button><span class="muted small">מוחק את כל נתוני המשחק לכל המחוברים</span></div>`;
+    if(dm&&gOwner()){
+      const dms=GMETA.dms;
+      h+=`<div class="gm-dm"><b>מנחי המשחק</b><p class="muted small">חשבונות Google שנכנסים במשחק הזה למצב מנחה. הבעלים${GMETA.ownerEmail?" ("+esc(GMETA.ownerEmail)+")":""} תמיד מנחה.</p>
+        ${dms.length?`<ul class="gm-list">${dms.map(m=>`<li><span style="direction:ltr;unicode-bidi:isolate">${esc(m)}</span>${m===String(GMETA.ownerEmail).toLowerCase()?`<span class="muted small">בעלים</span>`:`<button class="btn small ghost" data-dmx="${esc(m)}" aria-label="הסרת ${esc(m)}">הסרה</button>`}</li>`).join("")}</ul>`:""}
+        <div class="gm-row"><input type="text" id="gmDmIn" placeholder="name@gmail.com" style="direction:ltr" autocomplete="off" inputmode="email"><button class="btn small" id="gmDmAdd">הוספת מנחה</button></div>
+        <p class="small" role="alert" style="color:var(--bad,#b00)">${esc(ADDERR)}</p></div>`;
+    }
   } else {
     h+=`<p class="small">המכשיר לא מחובר למשחק, והחבורה נשמרת רק בו. כדי להצטרף, הכניסו את הקוד שקיבלתם מהמנחה:</p>`;
     if(dm) h+=`<div class="gm-row"><button class="btn small" id="gmResetBtn">איפוס החבורה במכשיר</button><span class="muted small">מוחק את כל הנתונים ששמורים במכשיר הזה</span></div>`;
   }
   h+=`<div class="gm-row"><label for="gmCodeIn">${GAME?"מעבר למשחק אחר":"קוד משחק"}</label><input type="text" id="gmCodeIn" inputmode="numeric" maxlength="11" placeholder="12345-67890" autocomplete="off" aria-describedby="gmErr">
     <button class="btn small ${GAME?"":"primary"}" id="gmJoinBtn" ${GBUSY||!online?"disabled":""}>התחברות</button></div><p class="small" id="gmErr" role="alert" style="color:var(--bad,#b00)"></p>`;
-  if(dm){
-    h+=`<div class="gm-dm"><h3>ניהול משחקים</h3>`;
-    if(!admin){
-      h+=`<p class="muted small">יצירת משחקים, רשימת המשחקים ומחיקה זמינות רק למנהל, אחרי כניסה עם חשבון Google של המנהל.</p>
-        <div class="gm-row"><button class="btn small" id="gmGoogle" ${online?"":"disabled"}>כניסה עם Google</button></div>`;
-      if(EXT.email&&EXT.email()) h+=`<p class="small">מחובר כ־${esc(EXT.email())}, שאינו חשבון המנהל. <button class="btn small ghost" id="gmSignOut">יציאה</button></p>`;
-    } else {
-      h+=`<p class="muted small">מחובר כמנהל: ${esc(EXT.email())} <button class="btn small ghost" id="gmSignOut">יציאה מ־Google</button></p>
-        <div class="gm-row"><label for="gmNewName">משחק חדש</label><input type="text" id="gmNewName" maxlength="40" placeholder="שם המשחק">
-        <label><input type="checkbox" id="gmNewCopy"> להעתיק את החבורה הנוכחית</label>
-        <button class="btn small primary" id="gmCreateBtn" ${GBUSY?"disabled":""}>יצירת משחק</button></div>
-        <p class="muted small">משחק חדש מקבל קוד אקראי בן 10 ספרות, ואת סיסמת המנחה ${PW_DEFAULT}. כדאי לשנות אותה מיד.</p>
-        <div class="gm-row"><b>המשחקים הקיימים</b><button class="btn small" id="gmRefresh">רענון הרשימה</button></div>`;
-      if(GLIST==="loading") h+=`<p class="muted small">טוען…</p>`;
-      else if(GLIST==="error") h+=`<p class="small">לא הצלחתי לטעון את הרשימה.</p>`;
-      else if(Array.isArray(GLIST)) h+=GLIST.length?`<ul class="gm-list">${GLIST.map(g=>`<li class="${g.code===GAME?"on":""}"><div class="gm-meta"><b>${esc(g.name||"ללא שם")}</b> · <span class="gm-code">${esc(fmtCode(g.code))}</span>
-          <div class="muted small">${g.names.length===1?"דמות אחת":g.names.length+" דמויות"}${g.names.length?": "+esc(g.names.join(", ")):""}${g.savedAt?" · נשמר "+esc(gmDate(g.savedAt)):""}</div></div>
-          <div class="gm-acts">${g.code===GAME?`<span class="small">המשחק הנוכחי</span>`:`<button class="btn small" data-gj="${esc(g.code)}">התחברות</button>`}<button class="btn small" data-gd="${esc(g.code)}">מחיקה</button></div></li>`).join("")}</ul>`:`<p class="muted small">אין עדיין משחקים.</p>`;
-    }
-    h+=`</div>`;
+  /* DM account */
+  h+=`<div class="gm-acct"><h3>חשבון מנחה</h3>`;
+  if(!google){
+    h+=`<p class="muted small">מנחים נכנסים עם חשבון Google. אחרי הכניסה אפשר ליצור משחקים, לראות את המשחקים שלך מכל מכשיר ולעבור למצב מנחה בלי סיסמה. שחקנים לא צריכים חשבון.</p>
+      <div class="gm-row"><button class="btn small" id="gmGoogle" ${online?"":"disabled"}>כניסה עם Google</button></div>`;
+  } else {
+    h+=`<div class="gm-row"><span class="small">מחובר כ־<b style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</b>${admin?" (מנהל)":""}</span><button class="btn small ghost" id="gmSignOut">יציאה מ־Google</button></div>`;
+    const list=admin?GLIST:MYLIST, owned=Array.isArray(MYLIST)?MYLIST.filter(g=>g.owner===EXT.uid()).length:0, full=!admin&&owned>=GAME_LIMIT;
+    h+=`<div class="gm-row"><label for="gmNewName">משחק חדש</label><input type="text" id="gmNewName" maxlength="40" placeholder="שם המשחק" ${full?"disabled":""}>
+        <label><input type="checkbox" id="gmNewCopy" ${full?"disabled":""}> להעתיק את החבורה הנוכחית</label>
+        <button class="btn small primary" id="gmCreateBtn" ${GBUSY||full?"disabled":""}>יצירת משחק</button></div>
+        <p class="muted small">${full?`הגעת למגבלה של ${GAME_LIMIT} משחקים. כדי ליצור משחק חדש, מחקו משחק ישן.`:`משחק חדש מקבל קוד אקראי בן 10 ספרות, ואת/ה הבעלים שלו.${admin?"":` אפשר להחזיק עד ${GAME_LIMIT} משחקים.`}`}</p>
+        <div class="gm-row"><b>${admin?"כל המשחקים":"המשחקים שלי"}</b><button class="btn small" id="gmRefresh">רענון הרשימה</button></div>`;
+    if(list==="loading") h+=`<p class="muted small">טוען…</p>`;
+    else if(list==="error") h+=`<p class="small">לא הצלחתי לטעון את הרשימה.</p>`;
+    else if(Array.isArray(list)) h+=gameRows(list,admin);
+    if(admin) h+=`<div class="set-sec" id="gmStats">${statsHTML()}</div>`;
   }
-  box.innerHTML=h;
+  h+=`</div><p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות באופן אנונימי (מתי, סוג המכשיר ולאיזה משחק), לצורך ניהול בלבד.</p>`;
+  box.innerHTML=h; bkSummary();
   const on=(id,f)=>{ const e=$(id); if(e) e.onclick=f; };
   on("gmCopy",async()=>{ try{ await navigator.clipboard.writeText(GAME); toast("הקוד הועתק"); }catch(e){ toast("הקוד: "+isoCode(GAME)); } });
   on("gmLeaveBtn",gmLeave); on("gmResetBtn",gmReset); on("gmJoinBtn",()=>gmJoin($("gmCodeIn").value));
   const ci=$("gmCodeIn"); if(ci){ ci.onkeydown=e=>{ if(e.key==="Enter") gmJoin(ci.value); };
     ci.oninput=()=>{ const d=ci.value.replace(/\D/g,"").slice(0,10); const v=d.length>5?d.slice(0,5)+"-"+d.slice(5):d; if(v!==ci.value){ ci.value=v; ci.setSelectionRange(v.length,v.length); } }; }
-  on("gmGoogle",async()=>{ try{ await EXT.signInGoogle(); }catch(e){ const er=$("gmErr"); if(er) er.textContent="הכניסה עם Google לא הושלמה"; } });
-  on("gmSignOut",async()=>{ try{ await EXT.signOutGoogle(); }catch(e){} GLIST=null; renderGame(); });
+  on("gmGoogle",gSignIn);
+  on("gmSignOut",async()=>{ try{ await EXT.signOutGoogle(); }catch(e){} GLIST=null; MYLIST=null; STATS=null; renderGame(); });
   on("gmCreateBtn",gmCreate); on("gmRefresh",gmLoadList);
+  on("gmDmAdd",()=>{ const v=String($("gmDmIn").value||"").trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ ADDERR="זו לא כתובת אימייל תקינה"; renderGame(); return; }
+    if(GMETA.dms.includes(v)){ ADDERR="החשבון כבר ברשימה"; renderGame(); return; }
+    if(GMETA.dms.length>=10){ ADDERR="אפשר עד 10 מנחים במשחק"; renderGame(); return; }
+    const base=GMETA.dms.length?GMETA.dms:(GMETA.ownerEmail?[String(GMETA.ownerEmail).toLowerCase()]:[]);
+    gmSetDms([...base,v]); });
+  const di=$("gmDmIn"); if(di) di.onkeydown=e=>{ if(e.key==="Enter") $("gmDmAdd").click(); };
+  box.querySelectorAll("[data-dmx]").forEach(b=>b.onclick=()=>gmSetDms(GMETA.dms.filter(x=>x!==b.dataset.dmx)));
   box.querySelectorAll("[data-gj]").forEach(b=>b.onclick=()=>gmJoin(b.dataset.gj));
-  box.querySelectorAll("[data-gd]").forEach(b=>b.onclick=()=>{ const g=(GLIST||[]).find(x=>x.code===b.dataset.gd); gmDelete(b.dataset.gd,g&&g.name); });
-  if(admin&&GLIST==null) gmLoadList();
+  box.querySelectorAll("[data-gd]").forEach(b=>b.onclick=()=>{ const l=admin?GLIST:MYLIST; const g=(Array.isArray(l)?l:[]).find(x=>x.code===b.dataset.gd); gmDelete(b.dataset.gd,g&&g.name); });
+  const sb=$("stRefresh"); if(sb) sb.onclick=statsLoad;
+  if(google&&online&&(admin?GLIST:MYLIST)==null) gmLoadList();
+  if(admin&&online&&STATS==null) statsLoad();
   renderHF();
 }
-if(EXT&&EXT.onAuth) EXT.onAuth(()=>{ GLIST=null; renderGame(); });
+async function gSignIn(){
+  try{ await EXT.signInGoogle(); }
+  catch(e){ const er=$("gmErr")||$("modeErr"); if(er) er.textContent="הכניסה עם Google לא הושלמה"; }
+}
+if(EXT&&EXT.onAuth) EXT.onAuth(()=>{
+  GLIST=null; MYLIST=null; STATS=null;
+  if(MODE==="dm"&&GAME&&!gIsDM()) setMode("player");
+  if(MG_OPEN&&MODE==="player"&&GAME) modeGame();   /* the dialog follows the account: into DM mode, or says this account is not a DM */
+  renderGame(); renderModeBtn();
+});
+
+/* ---------- anonymous visit counting (hosted version) ---------- */
+const DEV_ID=(()=>{ try{ let d=localStorage.getItem("sw-dev"); if(!d){ d=Math.random().toString(36).slice(2,12); localStorage.setItem("sw-dev",d); } return d; }catch(e){ return "?"; } })();
+let VISIT=null;
+async function logVisit(){
+  if(!EXT||!dbRef||VISIT) return;
+  const ua=navigator.userAgent||"";
+  const kind=/iPad|Tablet/i.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)?"טאבלט":/Mobi|Android|iPhone/i.test(ua)?"טלפון":"מחשב";
+  const br=/Edg\//.test(ua)?"Edge":/SamsungBrowser/.test(ua)?"Samsung":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":"אחר";
+  const now=new Date().toISOString();
+  VISIT={ref:dbRef.collection("visits").doc(),last:Date.now(),uid:EXT.uid()};
+  try{ await VISIT.ref.set({t:now,end:now,dev:DEV_ID,uid:EXT.uid(),game:GAME||"",mode:MODE,kind,br,email:gEmail()}); }catch(e){ VISIT.dead=true; }
+}
+function visitTouch(force){
+  if(!VISIT||VISIT.dead||VISIT.uid!==EXT.uid()) return;
+  if(!force&&Date.now()-VISIT.last<60000) return;
+  VISIT.last=Date.now(); VISIT.ref.update({end:new Date().toISOString(),game:GAME||"",mode:MODE}).catch(()=>{ VISIT.dead=true; });
+}
+if(EXT){ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") visitTouch(false); }); setInterval(()=>{ if(document.visibilityState==="visible") visitTouch(false); },5*60000); }
+async function statsLoad(){
+  if(!EXT||!EXT.isAdmin()||!dbRef) return; STATS="loading"; const b=$("gmStats"); if(b) b.innerHTML=statsHTML();
+  try{
+    const since=new Date(Date.now()-30*864e5).toISOString();
+    const q=await dbRef.collection("visits").where("t",">=",since).orderBy("t","desc").limit(2000).get();
+    STATS=q.docs.map(d=>Object.assign({id:d.id},d.data()));
+    /* tidy: visits older than 90 days are deleted, a few hundred at a time */
+    const old=await dbRef.collection("visits").where("t","<",new Date(Date.now()-90*864e5).toISOString()).limit(300).get();
+    for(const d of old.docs) dbRef.doc("visits/"+d.id).delete().catch(()=>{});
+  }catch(e){ console.warn(e); STATS="error"; }
+  const b2=$("gmStats"); if(b2){ b2.innerHTML=statsHTML(); const r=$("stRefresh"); if(r) r.onclick=statsLoad; }
+}
+function statsHTML(){
+  let h=`<div class="gm-row"><h3 style="margin:0">כניסות לאפליקציה</h3><button class="btn small" id="stRefresh">רענון</button></div>`;
+  if(STATS==null||STATS==="loading") return h+`<p class="muted small">טוען…</p>`;
+  if(STATS==="error") return h+`<p class="small">לא הצלחתי לטעון את הנתונים.</p>`;
+  const V=STATS, now=Date.now(), day=864e5, dkey=t=>new Date(t).toLocaleDateString("en-CA");
+  const inDays=n=>V.filter(v=>now-new Date(v.t)<n*day), uniq=a=>new Set(a.map(v=>v.dev)).size;
+  const today=V.filter(v=>dkey(v.t)===dkey(now));
+  const durs=V.map(v=>(new Date(v.end)-new Date(v.t))/60000).filter(m=>m>=0&&m<24*60), avg=durs.length?durs.reduce((a,b)=>a+b,0)/durs.length:0;
+  const tile=(n,l)=>`<div class="st-tile"><b>${n}</b><span>${l}</span></div>`;
+  h+=`<div class="st-tiles">${tile(today.length,"כניסות היום")}${tile(inDays(7).length,"כניסות ב־7 ימים")}${tile(V.length,"כניסות ב־30 ימים")}${tile(uniq(inDays(7)),"מכשירים ב־7 ימים")}${tile(uniq(V),"מכשירים ב־30 ימים")}${tile(avg<1?"פחות מדקה":Math.round(avg)+" דק׳","זמן ממוצע בכניסה")}</div>`;
+  const days=[...Array(14)].map((_,i)=>{ const d=new Date(now-(13-i)*day), k=dkey(d); const vs=V.filter(v=>dkey(v.t)===k); return {k,lab:d.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"}),n:vs.length,u:uniq(vs)}; });
+  const mx=Math.max(1,...days.map(d=>d.n));
+  h+=`<p class="small" style="margin:10px 0 4px"><b>לפי יום</b> <span class="muted">(כניסות · מכשירים)</span></p><div class="st-days">${days.map(d=>`<div class="st-day"><span class="st-lab">${esc(d.lab)}</span><span class="st-bar"><i style="width:${(d.n/mx*100).toFixed(1)}%"></i></span><span class="st-n">${d.n}${d.n?" · "+d.u:""}</span></div>`).join("")}</div>`;
+  const names=new Map((Array.isArray(GLIST)?GLIST:[]).map(g=>[g.code,g.name]));
+  const games=[...V.reduce((m,v)=>{ const k=v.game||""; const g=m.get(k)||{k,n:0,devs:new Set(),last:""}; g.n++; g.devs.add(v.dev); if(v.t>g.last) g.last=v.t; m.set(k,g); return m; },new Map()).values()].sort((a,b)=>b.n-a.n);
+  h+=`<p class="small" style="margin:10px 0 4px"><b>לפי משחק</b> <span class="muted">(30 ימים)</span></p><ul class="gm-list">${games.map(g=>`<li><div class="gm-meta"><b>${g.k?esc(names.get(g.k)||"משחק שנמחק"):"בלי משחק"}</b>${g.k?` · <span class="gm-code">${esc(fmtCode(g.k))}</span>`:""}
+    <div class="muted small">${g.n} כניסות · ${g.devs.size} מכשירים · אחרונה ${esc(gmDate(g.last))}</div></div></li>`).join("")||`<li class="muted small">אין עדיין כניסות.</li>`}</ul>`;
+  h+=`<details style="margin-top:8px"><summary class="small">הכניסות האחרונות</summary><ul class="gm-list">${V.slice(0,30).map(v=>{ const m=Math.round((new Date(v.end)-new Date(v.t))/60000);
+    return `<li><div class="gm-meta small"><b>${esc(gmDate(v.t))}</b> · ${esc(v.kind||"")} ${esc(v.br||"")} · ${v.game?esc(names.get(v.game)||fmtCode(v.game)):"בלי משחק"} · ${v.mode==="dm"?"מנחה":"שחקנים"} · ${m>=1?m+" דק׳":"פחות מדקה"}${v.email?` · <span style="direction:ltr;unicode-bidi:isolate">${esc(v.email)}</span>`:""}
+      <div class="muted">מכשיר ${esc(String(v.dev||"").slice(0,6))}</div></div></li>`; }).join("")}</ul></details>`;
+  return h;
+}
+
 /* Hugging Face token for portraits in the hosted version; kept on this device only */
 const hfTok=()=>{ try{ return localStorage.getItem("sw-hf-token")||""; }catch(e){ return ""; } };
 function renderHF(){
@@ -1861,16 +1974,18 @@ async function pwHash(p){ const t="sw-dm:"+p;
   catch(e){ let h=7; for(const ch of t) h=(h*31+ch.charCodeAt(0))|0; return "x"+h; } }
 async function pwOk(p){ const d=state.dm; if(!d||d.epoch!==PW_EPOCH||!d.hash) return p===PW_DEFAULT; return (await pwHash(p))===d.hash; }
 function renderModeBtn(){ const b=$("modeBtn"); if(!b) return; b.textContent=MODE==="dm"?"🛡 מצב מנחה":"🎲 מצב שחקנים";
-  b.title=MODE==="dm"?"חזרה למצב שחקנים או שינוי הסיסמה":"מעבר למצב מנחה (דורש סיסמה)"; }
+  b.title=MODE==="dm"?(EXT&&GAME?"חזרה למצב שחקנים":"חזרה למצב שחקנים או שינוי הסיסמה"):(EXT&&GAME?"מעבר למצב מנחה (למנחי המשחק שמחוברים עם Google)":"מעבר למצב מנחה (דורש סיסמה)"); }
 function modeDlg(title,body,acts){
   $("modeTitle").textContent=title; $("modeBody").innerHTML=body; $("modeErr").textContent="";
   const a=$("modeActs"); a.innerHTML="";
   for(const [label,cls,fn] of acts){const b=document.createElement("button"); b.className="btn "+cls; b.textContent=label; b.onclick=fn; a.appendChild(b);}
   $("modeScrim").hidden=false; const i=$("modeBody").querySelector("input"); (i||a.firstChild).focus();
 }
-function modeClose(){ $("modeScrim").hidden=true; }
+let MG_OPEN=false;
+function modeClose(){ $("modeScrim").hidden=true; MG_OPEN=false; }
 function setMode(m){ MODE=m; if(m==="player"&&!EXT&&!$("backupPanel").hidden){ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); } applyView(); renderAll(); renderGame(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
 $("modeBtn").onclick=()=>{
+  if(EXT&&GAME) return modeGame();
   if(MODE==="player"){
     const go=async()=>{ const p=$("pwIn").value; if(await pwOk(p)){ modeClose(); setMode("dm"); } else { $("modeErr").textContent="הסיסמה שגויה"; $("pwIn").select(); } };
     modeDlg("מעבר למצב מנחה",`<label for="pwIn">סיסמת המנחה</label><input type="password" id="pwIn" autocomplete="current-password">`,[["כניסה","primary",go],["ביטול","",modeClose]]);
@@ -1880,6 +1995,20 @@ $("modeBtn").onclick=()=>{
       [["חזרה למצב שחקנים","primary",()=>{modeClose();setMode("player");}],["שינוי הסיסמה","",pwChange],["סגירה","",modeClose]]);
   }
 };
+/* hosted games: DM mode by Google account instead of a password */
+function modeGame(){
+  if(MODE==="dm"){
+    modeDlg("מצב מנחה",`<p>במצב מנחה כל המסכים פתוחים, ואפשר לשנות הכול גם בזמן הרפתקה. בכל פתיחה האפליקציה חוזרת למצב שחקנים.</p><p class="muted small">מחובר כ־<span style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</span></p>`,
+      [["חזרה למצב שחקנים","primary",()=>{modeClose();setMode("player");}],["סגירה","",modeClose]]);
+    return;
+  }
+  if(gIsDM()){ modeClose(); setMode("dm"); return; }
+  const g=gGoogle();
+  modeDlg("מעבר למצב מנחה",g?`<p>החשבון <b style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</b> אינו מנחה במשחק הזה.</p><p class="muted small">בעלי המשחק יכולים להוסיף אותו ב״הגדרות״ ← ״מנחי המשחק״. אפשר גם להיכנס עם חשבון Google אחר.</p>`
+      :`<p>במשחק הזה מצב מנחה פתוח רק למנחים שמחוברים עם חשבון Google.</p>`,
+    [[g?"החלפת חשבון Google":"כניסה עם Google","primary",async()=>{ if(g){ try{ await EXT.signOutGoogle(); }catch(e){} } gSignIn(); }],["ביטול","",modeClose]]);
+  MG_OPEN=true;
+}
 function pwChange(){
   const go=async()=>{ const a=$("pwOld").value,b=$("pwNew").value,c=$("pwNew2").value;
     if(!(await pwOk(a))){ $("modeErr").textContent="הסיסמה הנוכחית שגויה"; return; }
