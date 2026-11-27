@@ -1360,7 +1360,7 @@ function speed(wtKg,carry){
 
 /* ---------- state ---------- */
 const uid=()=>Math.random().toString(36).slice(2,10);
-const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",langSel:[],notes:"",bg:"",player:"",age:"",sex:"",locked:false};
+const SHEET_DEF={dex:10,con:10,int:10,wis:10,cha:10,level:1,xp:0,align:"",hp:null,hpMax:null,langs:"",langSel:[],notes:"",bg:"",player:"",age:"",sex:"",locked:false,hspec:""};
 function newChar(name){return Object.assign({id:uid(),name:name||"דמות חדשה",cls:"",money:100,str:10,limit:null,cart:[],inv:[],spent:0,gain:0},SHEET_DEF,{book:[]});}
 let state={current:null,chars:[]};
 let saveTimer=null, store=null, dirty=false, writing=false, lastSaved=null, unsub=null, dbRef=null, uidRef=null;
@@ -2810,11 +2810,11 @@ function sheetPrintHTML(c){
   const P=PROG[c.cls], L=lvlOf(c), m=mods(c), tx=s=>(s||"").replace(/\s+/g," ").trim();
   const q=(sel,root=document)=>[...root.querySelectorAll(sel)];
   const al={order:"סדר",neutral:G(c,"ניטרלי","ניטרלית"),chaos:"תוהו"}[c.align]||"", sx=c.sex==="f"?"נקבה":c.sex==="m"?"זכר":"";
-  const title=P?ctitle(c,P.titles[L-1]):"";
+  const title=P?ctitle(c,P.titles[L-1])+hsTitle(c):"";
   const abil=ABIL.map(([k,n])=>({n,v:clampA(c[k]),prime:!!(P&&P.prime.includes(k)),mods:q("#abm-"+k+" span").map(e=>tx(e.textContent)).filter(x=>x&&x!=="—")}));
   const svRow=P?P.saves.find(([max])=>L<=max)[1]:[];
   const wrows=q("#shWeapons tbody tr").map(tr=>q("td",tr).map(td=>{const d=td.cloneNode(true); d.querySelectorAll(".tag").forEach(x=>x.remove()); return tx(d.textContent);}));
-  const abl=q("#shAbilities li:not(.later)").map(li=>{ const lv=li.querySelector(".lv"); return tx((lv?lv.textContent+": ":"")+[...li.childNodes].filter(n=>n!==lv).map(n=>n.textContent).join("")); }).filter(x=>x&&x!=="בחרו סוג דמות.");
+  const abl=q("#shAbilities li:not(.later):not(.hs-pick)").map(li=>{ const lv=li.querySelector(".lv"); return tx((lv?lv.textContent+": ":"")+[...li.childNodes].filter(n=>n!==lv).map(n=>n.textContent).join("")); }).filter(x=>x&&x!=="בחרו סוג דמות.");
   const skl=SKILLS[c.cls]?q("#shSkills .skl > div").map(d=>[tx(d.children[0].textContent),tx(d.children[1].textContent)]):[];
   const perDay=q("#shSpells .spl > div").map(d=>`${tx(d.children[0].textContent)} ${tx(d.children[1].textContent)}`);
   const known=isBookCls(c)?(c.book||[]).map(id=>WSP_BY[id]).filter(Boolean).sort((a,b)=>a[0]-b[0]):[];
@@ -3243,7 +3243,48 @@ const shatterOf=c=>{const t=clampA(c.str)+clampA(c.wis);return t<=13?1:t<=18?2:t
 const RUNE_COST=[3,4,5,6,7,9,11,14];
 /* classes that keep their spells in a book (wizard, elf, half-elf pathfinder) or as tattoos (rune-smith) */
 const BOOK_CLS=["wizard","elf","pathf","runesmith"];
-const isBookCls=c=>BOOK_CLS.includes(c&&c.cls);
+/* ---------- halfling pathfinder: a secondary profession from level 6 (מת' 23–24, with the errata) ---------- */
+const HSPEC={
+  thief:{stat:"dex",m:"גנב",f:"גנבת",name:["גשש־גנב","גששית־גנבת"],ab:[
+    [6,"פריצת מנעולים כמו גנב בדרגה שהיא מחצית מדרגתו (מעוגל מטה), עם השפעת הזריזות. בחוברת מודפס \"מלאכה עדינה\"; הארטה מתקנת לפריצת מנעולים","מת' 23 · ארטה"],
+    [9,"דקירה בגב: בהפתעה מאחור +4 לפגיעה ונזק כפול; משולש מדרגה 13","מת' 23"],
+    [12,"קריאת שפה רגילה: מבין את המסר העיקרי ברוב הכתבים בכל השפות המוכרות, גם בלי לדבר אותן; 80% להבין מפות אוצר או מסמכים","מת' 23"],
+    [15,"קריאת כתבים קסומים: קורא כתב קסם ומטיל ממגילות לחשי קוסם מעוצמה 1 עד 4; מעוצמות גבוהות יותר לא יצליח","מת' 23"]]},
+  cleric:{stat:"wis",m:"כוהן",f:"כוהנת",name:["גשש־כוהן","גששית־כוהנת"],ab:[
+    [6,"הטלת לחשי כוהן כמו כוהן בדרגה שהיא שליש מדרגתו (מעוגל מטה)","מת' 23"],
+    [12,"גירוש אל־מתים כמו כוהן בדרגה שהיא מחצית מדרגתו (מעוגל מטה), רק אם נוטה לסדר. נוטה לתוהו: הטלת אימה באל־מתים, אם המנחה מאפשרת","מת' 23"]]},
+  fighter:{stat:"str",m:"לוחם",f:"לוחמת",name:["גשש־לוחם","גששית־לוחמת"],ab:[
+    [6,"סגנון לחימה: התקפה ברוטלית, מכה מלומדת או פעולת הסחה","מת' 24"],
+    [9,"סגנון לחימה שני מתוך השלושה","מת' 24"],
+    [12,"סגנון לחימה מתקדם, לפי הסגנונות מדרגות 6 ו־9: ברוטלית ואכזרית, ברוטלית ומאיימת, מלומדת וזהירה, מלומדת ומהירה, הסחה נועזת או הסחה מושכת","מת' 24"],
+    [15,"סגנון לחימה מתקדם נוסף","מת' 24"]]},
+  wizard:{stat:"int",m:"קוסם",f:"קוסמת",name:["גשש־קוסם","גששית־קוסמת"],ab:[
+    [6,"הטלת לחשי קוסם כמו קוסם בדרגה שהיא שליש מדרגתו (מעוגל מטה). צריך להשיג ספר לחשים עם לחשים מתאימים, למשל לקנות מקוסם","מת' 24"]]}
+};
+const HSPEC_ORDER=["thief","cleric","fighter","wizard"];
+const STAT_NAME={str:"כוח",dex:"זריזות",con:"חוסן",int:"תבונה",wis:"חוכמה",cha:"כריזמה"};
+/* the chosen specialization, once the halfling has reached level 6 */
+const hspec=c=>!!(c&&c.cls==="halfling"&&c.hspec&&HSPEC[c.hspec]&&lvlOf(c)>=6)?c.hspec:"";
+/* who a character casts like: its own class, or a halfling cleric / wizard specialist at a third of its level */
+function castSrc(c){ const h=hspec(c); if(h==="cleric"||h==="wizard") return {P:PROG[h],L:Math.max(1,Math.floor(lvlOf(c)/3)),as:h}; return {P:PROG[c&&c.cls],L:lvlOf(c),as:null}; }
+const hspecAbil=c=>{ const h=c&&c.cls==="halfling"&&c.hspec&&HSPEC[c.hspec]; return h?h.ab.map(([lv,t,src])=>[lv,`${G(c,h.name[0],h.name[1])}: ${t}`,src]):[]; };
+const abilRows=c=>(ABIL_TEXT[c.cls]||[]).concat(hspecAbil(c));
+const isBookCls=c=>BOOK_CLS.includes(c&&c.cls)||hspec(c)==="wizard";
+/* the secondary title: the specialization's own title at half the halfling's level (מת' 24, טבלה 16) */
+const hsTitle=c=>{ const h=hspec(c); if(!h) return ""; const t=PROG[h].titles[Math.floor(lvlOf(c)/2)-1]; return t?" ו"+ctitle(c,t):""; };
+/* the sheet's choice of specialization: from level 6, by the matching ability score; once chosen it stays (מת' 23) */
+function hspecPick(c,L,m){
+  if(c.hspec&&HSPEC[c.hspec]) return `<li class="hs-pick"><b>התמחות: ${G(c,HSPEC[c.hspec].name[0],HSPEC[c.hspec].name[1])}</b>${L<6?` <span class="muted small">(תחול מדרגה 6)</span>`:""} <button class="btn small" type="button" data-hs-undo>תיקון הבחירה</button> <small>(מת' 23)</small></li>`;
+  if(L<6) return `<li class="hs-pick later"><span class="lv">דרגה 6</span>בחירת התמחות במקצוע משני <small>(מת' 23)</small></li>`;
+  const val=k=>Number(c[k]==null?10:c[k]);
+  return `<li class="hs-pick"><b>בחירת התמחות:</b> <select data-hs aria-label="התמחות במקצוע משני"><option value="">— בחירה —</option>${HSPEC_ORDER.map(k=>{ const ok=val(HSPEC[k].stat)>=13;
+    return `<option value="${k}" ${ok?"":"disabled"}>${G(c,HSPEC[k].name[0],HSPEC[k].name[1])} (${STAT_NAME[HSPEC[k].stat]} 13+${ok?"":", יש "+val(HSPEC[k].stat)})</option>`; }).join("")}</select>
+    <div class="muted small">כל התמחות דורשת ערך 13 לפחות בתכונה המתאימה. אחרי הבחירה אי אפשר לשנות (מת' 23).</div></li>`;
+}
+document.addEventListener("change",e=>{ const t=e.target; if(!t.matches||!t.matches("#shAbilities [data-hs]")||!t.value) return; const c=cur(), k=t.value; t.value="";
+  ask("לבחור התמחות?",`${c.name||"הדמות"} ${G(c,"יתמחה","תתמחה")} כ${HSPEC[k][isF(c)?"f":"m"]}. לפי החוברת אי אפשר לשנות את הבחירה אחר כך (מת' 23).`,"בחירה",()=>{ c.hspec=k; schedule(); renderAll(); }); });
+document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest("#shAbilities [data-hs-undo]"); if(!b) return; const c=cur();
+  ask("לתקן את בחירת ההתמחות?","לפי החוברת אי אפשר להחליף התמחות. התיקון מיועד לבחירה שנעשתה בטעות, ומחזיר את הבחירה לפתוחה. לחשים שהוכנו מההתמחות יימחקו מרשימת היום.","תיקון",()=>{ c.hspec=""; c.prep=[]; schedule(); renderAll(); }); });
 const spRow=(P,L)=>P?(P.spellsByLevel?(P.spellsByLevel[L-1]||[]).slice():P.spells?P.spells.map(a=>a[L-1]||0):[]):[];
 const PARRY=[[9,0],[12,-1],[14,-2],[16,-3],[17,-4],[18,-5]];
 const WDMG={hclub:["1ק6",0],bclub:["1ק8",0],handaxe:["1ק6",0],baxe:["1ק8",0],spear:["1ק6",0],lsword:["1ק8",0],"2hsword":["1ק10",0],bastard:["1ק8",0],ssword:["1ק6",0],polearm:["1ק8",1],staff:["1ק6",0],club:["1ק4",0],dagger:["1ק4",0],whammer:["1ק4",1],lance:["2ק4",1],sickle:["1ק6",0],dart:["1ק3",0],javelin:["1ק6",0],arrows:["1ק6",0],lbolts:["1ק4",1],hbolts:["1ק6",1],stones:["1ק4",0]};
@@ -3316,7 +3357,7 @@ function sheetFill(){
 function sheetDerived(){
   const c=cur(), P=PROG[c.cls], C=CLASSES[c.cls], m=mods(c), L=lvlOf(c), t=invTotals(c);
   /* identity */
-  $("shTitle").textContent=P?`${cname(c)} · ${ctitle(c,P.titles[L-1])} · דרגה ${L}`:"בחרו סוג דמות כדי לחשב את הדף";
+  $("shTitle").textContent=P?`${cname(c)} · ${ctitle(c,P.titles[L-1])}${hsTitle(c)} · דרגה ${L}`:"בחרו סוג דמות כדי לחשב את הדף";
   const alW=[];
   if(c.cls==="cleric"&&c.align==="neutral") alW.push(G(c,"כוהן ניטרלי","כוהנת ניטרלית")+" רק באישור המנחה (ש 26)");
   if(c.cls==="druid"&&c.align&&c.align!=="neutral") alW.push(G(c,"דרואיד חייב","דרואידית חייבת")+" נטייה ניטרלית (מת' 29)");
@@ -3389,45 +3430,49 @@ function sheetDerived(){
   if(hasI(c,"oil")) rows.push(["שמן מנורות (השלכה)","הטלה",sgn(base+m.missile),"1ק4","+1 נזק בכל אחד משני הסיבובים הבאים (ש 43)"]);
   if(hasI(c,"holywater")) rows.push(["מים קדושים","התזה",sgn(base+m.missile),"1ק6","רק נגד רוב האל־מתים והשדים (ש 43)"]);
   $("shWeapons").innerHTML=rows.length?`<div class="tw"><table><thead><tr><th>נשק</th><th>סוג וטווח</th><th>פגיעה</th><th>נזק</th><th>הערות</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="num"><b>${r[2]}</b></td><td class="num"><b>${r[3]}</b></td><td class="muted">${r[4]}</td></tr>`).join("")}</tbody></table></div>
-    <p class="muted small">פגיעה = ק20 + התוסף, שווה או גבוה מהדרג״ש של היריב. חוק בית: 20 טבעי פוגע ומכפיל נזק, 1 טבעי משתבש (ש 62).${c.cls==="thief"?` ${G(c,"גנב","גנבת")} מאחור: +4 לפגיעה ונזק ${L>=15?"פי 5":L>=10?"פי 4":L>=5?"משולש":"כפול"} (ש 24, מת' 5).`:" מאחור: +2 לפגיעה."}</p>`
+    <p class="muted small">פגיעה = ק20 + התוסף, שווה או גבוה מהדרג״ש של היריב. חוק בית: 20 טבעי פוגע ומכפיל נזק, 1 טבעי משתבש (ש 62).${c.cls==="thief"?` ${G(c,"גנב","גנבת")} מאחור: +4 לפגיעה ונזק ${L>=15?"פי 5":L>=10?"פי 4":L>=5?"משולש":"כפול"} (ש 24, מת' 5).`:hspec(c)==="thief"&&L>=9?` דקירה בגב (בהפתעה מאחור): +4 לפגיעה ונזק ${L>=13?"משולש":"כפול"} (מת' 23).`:" מאחור: +2 לפגיעה."}</p>`
     :'<p class="muted">אין נשק בסל. אפשר לקנות בחנות.</p>';
   /* class abilities */
-  const ab=(ABIL_TEXT[c.cls]||[]).map(([lv,txt,src])=>`<li class="${lv>L?"later":""}">${lv>1?`<span class="lv">דרגה ${lv}</span>`:""}${femTxt(c,txt)} <small>(${src})</small></li>`);
+  const ab=abilRows(c).map(([lv,txt,src])=>`<li class="${lv>L?"later":""}">${lv>1?`<span class="lv">דרגה ${lv}</span>`:""}${femTxt(c,txt)} <small>(${src})</small></li>`);
   if(c.cls==="paladin") ab.splice(2,0,`<li><b>מאגר דבקות: ${PROG.paladin.devotion[L-1]}</b> נקודות, מתחדש אחרי שינה. הנחת ידיים מרפאת ${2+L} נק״פ. <small>(מת' 37)</small></li>`);
   if(c.cls==="fighter") ab.splice(2,0,`<li>הדיפה עכשיו: ${m.d>=10?band(m.d,PARRY)+" להתקפות האויבים":"דורשת זריזות 10+"} <small>(ש 29)</small></li>`);
+  if(c.cls==="halfling") ab.push(hspecPick(c,L,m));
   $("shAbilities").innerHTML=ab.length?ab.join(""):'<li class="muted">בחרו סוג דמות.</li>';
   /* skills */
   const S=SKILLS[c.cls]; $("shSkillsBox").hidden=!S;
   if(S){ const armorMove=(c.cls==="halfling"?(hasI(c,"plate")?-20:hasAnyI(c,["ring","chainm"])?-10:0):c.cls==="bard"?(hasI(c,"ring")?-10:0):c.cls==="pathf"?(hasAnyI(c,["ring","chainm"])?-10:0):0);
     $("shSkillsTitle").innerHTML=`${S.title} <small>${S.src}</small>`;
-    $("shSkills").innerHTML=`<div class="skl">${S.rows.map(([n,vals,dexApplies,special])=>{const v=vals[Math.min(L,vals.length)-1];
+    const rows=S.rows.slice(); if(hspec(c)==="thief"){ const tl=SKILLS.thief.rows.find(r=>r[0]==="פריצת מנעולים"); rows.push(["פריצת מנעולים (כגנב בדרגה "+Math.floor(L/2)+")",tl[1].map((v,i,a)=>a[Math.max(0,Math.floor((i+1)/2)-1)]),1]); }
+    $("shSkills").innerHTML=`<div class="skl">${rows.map(([n,vals,dexApplies,special])=>{const v=vals[Math.min(L,vals.length)-1];
       if(dexApplies==="d6") return `<div><span>${n}</span><b class="num">1–${v} בק6</b></div>`;
       let tot=v+(dexApplies?m.thiefPct:0)+(special==="move"?armorMove:0); tot=Math.max(0,Math.min(100,tot));
       return `<div><span>${n}</span><b class="num">${tot}%</b></div>`;}).join("")}</div>
-      <p class="muted small">כולל ${sgn(m.thiefPct)}% מזריזות${armorMove?` ו־${armorMove}% לתנועה חרישית בגלל השריון`:""}. בק% מצליחים בתוצאה שווה או נמוכה.</p>`;}
+      <p class="muted small">כולל ${sgn(m.thiefPct)}% מזריזות${armorMove?` ו־${armorMove}% לתנועה חרישית בגלל השריון`:""}. בק% מצליחים בתוצאה שווה או נמוכה.${hspec(c)==="thief"?" פריצת מנעולים לפי טבלת מיומנויות הגנב (מת' 7, טבלה 2) בדרגה שהיא מחצית מדרגת הגשש (מת' 23, ארטה).":""}</p>`;}
   /* spells */
-  let sp=(P&&(P.spells||P.spellsByLevel))?spRow(P,L):null;
-  if(sp&&P.spellStat&&!P.tattoos){const b=P.spellStat==="int"?m.intBonus:m.wisBonus; if(b){sp[0]=(sp[0]||0)+b;}}
+  const CS=castSrc(c), PS=CS.P, SL=CS.L;
+  let sp=(PS&&(PS.spells||PS.spellsByLevel))?spRow(PS,SL):null;
+  if(sp&&PS.spellStat&&!PS.tattoos){const b=PS.spellStat==="int"?m.intBonus:m.wisBonus; if(b){sp[0]=(sp[0]||0)+b;}}
   const anySp=sp&&sp.some(x=>x>0);
-  $("shSpellsBox").hidden=!(P&&(P.spells||P.spellsByLevel));
-  if(P&&(P.spells||P.spellsByLevel)){
-    const mx=P.spellStat==="int"?m.intMax:P.spellStat==="wis"?m.wisMax:null;
-    $("shSpells").innerHTML=P.tattoos?`<div class="spl">${sp.map((n,i)=>n?`<div><b class="num">${n}</b><span>קעקועים מעוצמה ${i+1}</span></div>`:"").join("")}</div>
+  $("shSpellsBox").hidden=!(PS&&(PS.spells||PS.spellsByLevel));
+  if(PS&&(PS.spells||PS.spellsByLevel)){
+    const mx=PS.spellStat==="int"?m.intMax:PS.spellStat==="wis"?m.wisMax:null;
+    $("shSpells").innerHTML=PS.tattoos?`<div class="spl">${sp.map((n,i)=>n?`<div><b class="num">${n}</b><span>קעקועים מעוצמה ${i+1}</span></div>`:"").join("")}</div>
       <p class="muted small">מספר הקעקועים המרבי מכל עוצמה (מת' 41, טבלה 29), בלי תוסף תבונה. אין מגבלה על מספר ההטלות ביום: כל הטלה עולה נק״פ לפי העוצמה (${RUNE_COST.map((n,i)=>`${i+1}: ${n}`).join(" · ")}, מת' 39). מטילים במסך מעקב ההרפתקה. רמת לחש מרבית ${m.intMax}.</p>`
       :anySp?`<div class="spl">${sp.map((n,i)=>n?`<div><b class="num">${n}</b><span>עוצמה ${i+1}</span></div>`:"").join("")}</div>
-      ${prepSummary(c)}<p class="muted small">${P.spellStat?`כולל ${sgn(P.spellStat==="int"?m.intBonus:m.wisBonus)} לעוצמה 1 מ${P.spellStat==="int"?"תבונה":"חוכמה"}. רמת לחש מרבית ${mx}.`:""} ${isBookCls(c)?"הלחשים חייבים להיות כתובים בספר הלחשים.":""}</p>`
-      :`<p class="muted">${c.cls==="paladin"?G(c,"פלאדין מטיל","פלאדינית מטילה")+" לחשים מדרגה 9 (מת' 35).":"אין עדיין לחשים בדרגה הזו."+(P.spellStat?" תוסף מ"+(P.spellStat==="int"?"תבונה":"חוכמה")+" 12+ נותן לחשים כבר בדרגה 1.":"")}</p>`;
+      ${prepSummary(c)}<p class="muted small">${CS.as?`${G(c,"מטיל","מטילה")} לחשים כמו ${HSPEC[CS.as][isF(c)?"f":"m"]} בדרגה ${SL}, שליש מדרגת הגשש (מת' 23–24). `:""}${PS.spellStat?`כולל ${sgn(PS.spellStat==="int"?m.intBonus:m.wisBonus)} לעוצמה 1 מ${PS.spellStat==="int"?"תבונה":"חוכמה"}. רמת לחש מרבית ${mx}.`:""} ${isBookCls(c)?"הלחשים חייבים להיות כתובים בספר הלחשים.":""}</p>`
+      :`<p class="muted">${CS.as?`${G(c,"מטיל","מטילה")} לחשים כמו ${HSPEC[CS.as][isF(c)?"f":"m"]} בדרגה ${SL} (מת' 23–24). `:""}${c.cls==="paladin"?G(c,"פלאדין מטיל","פלאדינית מטילה")+" לחשים מדרגה 9 (מת' 35).":"אין עדיין לחשים בדרגה הזו."+(PS.spellStat?" תוסף מ"+(PS.spellStat==="int"?"תבונה":"חוכמה")+" 12+ נותן לחשים כבר בדרגה 1.":"")}</p>`;
   }
   /* turning */
-  const canTurn=c.cls==="cleric"||c.cls==="stonew"; $("shTurnBox").hidden=!canTurn;
+  const hTurn=hspec(c)==="cleric"&&L>=12, canTurn=c.cls==="cleric"||c.cls==="stonew"||hTurn; $("shTurnBox").hidden=!canTurn;
   const tcell=v=>v==="ג"?"גירוש אוטומטי":v==="ה"?"השמדה":v==="ק"?"קירקוע אוטומטי":v==="א"?"אובדן תעופה":v;
   if(c.cls==="stonew"){ const col=turnCol(L);
     $("shTurnTitle").innerHTML=`משיכת האדמה וניתוץ אבן <small>מת' 47–48</small>`;
     $("shTurn").innerHTML=`<p class="small"><b>ניתוץ מבני אבן:</b> מצליח ב־1–${shatterOf(c)} בק10 (כוח + חוכמה = ${clampA(c.str)+clampA(c.wis)}, טבלה 34).</p>
       <div class="tw"><table class="turn"><thead><tr><th>ק״פ</th><th>יצור מעופף לדוגמה</th><th>2ק10</th></tr></thead><tbody>${PULL.map(([n,v],i)=>`<tr><td class="num">${i<12?i+1:"13+"}</td><td>${n}</td><td class="num"><b>${tcell(v[col])}</b></td></tr>`).join("")}</tbody></table></div>
       <p class="muted small">משיכת האדמה (טבלה 35): רק על אדמה או סלע טבעיים. הצלחה: 1ק6 יצורים מעופפים מהסוג מקורקעים ל־3ק6 סיבובים. "אובדן תעופה" הוא לצמיתות.</p>`;}
-  else if(canTurn){ const col=turnCol(L); $("shTurnTitle").innerHTML=`גירוש אל־מתים <small>ש 26 · מת' 8</small>`;
-    $("shTurn").innerHTML=(c.align&&c.align!=="order"?`<p class="dn small">${G(c,"רק כוהן הנוטה לסדר יכול","רק כוהנת הנוטה לסדר יכולה")} לגרש אל־מתים.</p>`:"")+
+  else if(canTurn){ const TL=hTurn?Math.floor(L/2):L, col=turnCol(TL); $("shTurnTitle").innerHTML=hTurn?`גירוש אל־מתים <small>מת' 23 · מת' 8</small>`:`גירוש אל־מתים <small>ש 26 · מת' 8</small>`;
+    $("shTurn").innerHTML=(hTurn?`<p class="small">${G(c,"מגרש","מגרשת")} כמו ${G(c,"כוהן","כוהנת")} בדרגה ${TL}, מחצית מדרגת הגשש (מת' 23). נוטה לתוהו: הטלת אימה באל־מתים במקום גירוש, אם המנחה מאפשרת.</p>`:"")+
+      (c.align&&c.align!=="order"&&!hTurn?`<p class="dn small">${G(c,"רק כוהן הנוטה לסדר יכול","רק כוהנת הנוטה לסדר יכולה")} לגרש אל־מתים.</p>`:"")+
       `<div class="tw"><table class="turn"><thead><tr><th>ק״פ</th><th>דוגמה</th><th>2ק10</th></tr></thead><tbody>${TURN.map(([n,v],i)=>`<tr><td class="num">${i<12?i+1:"13+"}</td><td>${n}</td><td class="num"><b>${tcell(v[col])}</b></td></tr>`).join("")}</tbody></table></div>
       <p class="muted small">הצלחה: 2ק6 אל־מתים בורחים ל־3ק6 סיבובים. השמדה: 2ק6 אל־מתים מתפוררים לאבק (מת' 8, טבלה 4).</p>`;}
   /* gear */
@@ -3638,7 +3683,7 @@ function renderBook(){
     nb.textContent=`אין ספר לחשים בציוד של ${c.name||"הדמות"}, ולכן אין ספר לחשים לכתוב בו או להכין ממנו לחשים. ${inCart?"ספר הלחשים נמצא בסל, ויופיע כאן אחרי הקנייה.":"אפשר לקנות \"ספר לחשים ריק\" בחנות הציוד."}${n?` ${n} הלחשים שהיו רשומים בספר שמורים, ויחזרו כשיהיה ספר.`:""}`;
     return;
   }
-  const castable=spRow(P,L);
+  const castable=spRow(castSrc(c).P,castSrc(c).L);
   const cap=lv=>castable[lv-1]||0;
   const canCast=lv=>cap(lv)>0||(!tat&&lv===1&&m.intBonus>0);
   const inBook=c.book.filter(id=>WSP_BY[id]);
@@ -3654,7 +3699,7 @@ function renderBook(){
   for(let lv=1;lv<=8;lv++){
     const list=inBook.map(id=>WSP_BY[id]).filter(s=>s[0]===lv);
     if(!list.length) continue;
-    html+=`<div class="bk-lv"><h4>עוצמה ${lv} ${tagFor(lv)}</h4>${list.map(s=>{const ex=spellExtra(s[1],L);
+    html+=`<div class="bk-lv"><h4>עוצמה ${lv} ${tagFor(lv)}</h4>${list.map(s=>{const ex=spellExtra(s[1],castSrc(c).L);
       return `<div class="bk-sp"><div class="bk-h"><b>${s[2]}</b><button class="btn small ghost" data-rm="${s[1]}" aria-label="הסרת ${s[2]}">הסרה</button></div>
       <div class="bk-m">טווח: ${s[3]} · משך: ${s[4]} <small>(${s[6]})</small>${tat?` · הטלה: ${RUNE_COST[lv-1]} נק״פ`:""}</div><div class="bk-d">${s[5]}${ex?` <b>${ex}</b>`:""}</div>${fullTxt(s[1])}</div>`;}).join("")}</div>`;
   }
@@ -3812,7 +3857,7 @@ const SPELL_BY=id=>WSP_BY[id]||DSP_BY[id];
 function spellPool(c){
   const m=mods(c);
   if(isBookCls(c)) return (!PROG[c.cls].tattoos&&!hasBook(c))?[]:(c.book||[]).map(id=>WSP_BY[id]).filter(s=>s&&s[0]<=m.intMax);
-  const tag=c.cls==="cleric"?"c":c.cls==="paladin"?"p":c.cls==="druid"?"d":c.cls==="stonew"?"s":null; if(!tag) return [];
+  const tag=(c.cls==="cleric"||hspec(c)==="cleric")?"c":c.cls==="paladin"?"p":c.cls==="druid"?"d":c.cls==="stonew"?"s":null; if(!tag) return [];
   return DSP.filter(s=>s[7].includes(tag)&&s[0]<=(m.wisMax||9));
 }
 const prepOf=(c,lv,s)=>(c.prep||[]).find(p=>p.lv===lv&&p.s===s);
@@ -3824,7 +3869,7 @@ function prepHTML(c,sl){
   let h=`<div class="prep"><div class="prep-h"><b class="small">לחשים להיום</b><span class="muted small">${isBook?"מהספר; אפשר להכין לחש יותר מפעם אחת":"מהרשימה; אפשר להכין לחש יותר מפעם אחת"}</span></div>`;
   sl.forEach((n,i)=>{ if(!n) return; const lv=i+1, opts=pool.filter(s=>s[0]===lv);
     h+=`<div class="prep-lv"><span class="muted small">עוצמה ${lv}</span>`;
-    for(let s=0;s<n;s++){ const p=prepOf(c,lv,s), sp=p&&SPELL_BY(p.id), ex=sp&&isBook?spellExtra(sp[1],L):"";
+    for(let s=0;s<n;s++){ const p=prepOf(c,lv,s), sp=p&&SPELL_BY(p.id), ex=sp&&isBook?spellExtra(sp[1],castSrc(c).L):"";
       h+=`<div class="prep-row${p&&p.cast?" cast":""}">
         <select data-ch="prep" data-id="${c.id}" data-lv="${lv}" data-s="${s}" aria-label="לחש מוכן ${s+1} מעוצמה ${lv}" ${p&&p.cast?"disabled":""}><option value="">— בחירת לחש —</option>${opts.map(o=>`<option value="${o[1]}"${p&&p.id===o[1]?" selected":""}>${esc(o[2])}</option>`).join("")}</select>
         <button class="btn small${p&&!p.cast?" primary":""}" data-act="cast" data-id="${c.id}" data-lv="${lv}" data-s="${s}" ${p?"":"disabled"} aria-pressed="${!!(p&&p.cast)}">${p&&p.cast?"הוטל ✓":"הטלה"}</button>
@@ -3940,7 +3985,7 @@ function attacksOf(txt){
   return out;
 }
 function acOf(c){const m=mods(c);const armors=Object.keys(ARMOR_AC).filter(id=>hasI(c,id)).sort((a,b)=>ARMOR_AC[b]-ARMOR_AC[a]);return 10+(armors[0]?ARMOR_AC[armors[0]]:0)+(hasAnyI(c,["shield","woodshield"])?1:0)+m.acDex;}
-function slotsOf(c){const P=PROG[c.cls];if(!P||P.tattoos)return[];const m=mods(c),L=lvlOf(c);let sp=(P.spells||P.spellsByLevel)?spRow(P,L):null;
+function slotsOf(c){const {P,L}=castSrc(c);if(!P||P.tattoos)return[];const m=mods(c);let sp=(P.spells||P.spellsByLevel)?spRow(P,L):null;
   if(sp&&P.spellStat){const b=P.spellStat==="int"?m.intBonus:m.wisBonus;if(b)sp[0]=(sp[0]||0)+b;} return sp||[];}
 /* XP bonus: prime requisite 13+ = +5%, charisma 13+ = +5% (ש 22, as on the sheet) */
 function xpBonusOf(c){const P=PROG[c.cls];if(!P)return 0;const m=mods(c);
@@ -3971,7 +4016,10 @@ function lvChanges(c,L,N){
   const s0=sp(L), s1=sp(N); const sd=s1.map((v,i)=>v!==(s0[i]||0)?`עוצמה ${i+1}: ${s0[i]||0} ← ${v}`:"").filter(Boolean);
   if(sd.length) out.push((P.tattoos?"קעקועים מרביים: ":"לחשים ביום (לפני תוספי תכונה): ")+sd.join(", ")+(P.tattoos?". קעקוע חדש לוקח שעה לכל עוצמה ודורש דיו מתאים (מת' 38–39).":["wizard","elf","pathf"].includes(c.cls)?". לחשים חדשים לא נכנסים לספר הלחשים מעצמם, וצריך להשיג ולהעתיק אותם (ש 56–57).":["cleric","druid","stonew"].includes(c.cls)?". כל רשימת הלחשים מהעוצמה החדשה פתוחה לתפילה כבר מהבוקר הבא (ש 56).":""));
   if(SKILLS[c.cls]) out.push(`${SKILLS[c.cls].title} משתפרות לפי הטבלה (${SKILLS[c.cls].src}).`);
-  (ABIL_TEXT[c.cls]||[]).filter(a=>a[0]===N).forEach(a=>out.push(`יכולת בדרגה ${N}: ${femTxt(c,a[1])} (${a[2]})`));
+  if(c.cls==="halfling"&&N===6&&!c.hspec) out.push(`בדרגה 6 ${G(c,"הוא בוחר","היא בוחרת")} התמחות במקצוע משני: גנב, כוהן, לוחם או קוסם, לפי ערך 13 לפחות בתכונה המתאימה. בוחרים בדף הדמות, ואחרי הבחירה אי אפשר לשנות (מת' 23).`);
+  if(hspec({...c,level:N})==="cleric"||hspec({...c,level:N})==="wizard"){ const a=castSrc({...c,level:L}).L, b=castSrc({...c,level:N}).L; if(L<6||a!==b) out.push(`${G(c,"מטיל","מטילה")} לחשים כמו ${HSPEC[c.hspec][isF(c)?"f":"m"]} בדרגה ${b} (מת' 23–24).`); }
+  if(c.hspec&&c.cls==="halfling"&&Math.floor(N/2)!==Math.floor(L/2)&&N>=6){ const t=PROG[c.hspec].titles[Math.floor(N/2)-1], t0=L>=6?PROG[c.hspec].titles[Math.floor(L/2)-1]:""; if(t&&t!==t0) out.push(`תואר משני: ${ctitle(c,t)} (מת' 24, טבלה 16)`); }
+  abilRows(c).filter(a=>a[0]===N).forEach(a=>out.push(`יכולת בדרגה ${N}: ${femTxt(c,a[1])} (${a[2]})`));
   if((CLASS_LV_ABIL[c.cls]||[]).includes(N)) out.push(`בדרגה ${N} ${G(c,"הוא מקבל","היא מקבלת")} יכולת נוספת לבחירה, בנוסף ליכולות הקודמות (ש 56). פירוט בתיאור סוג הדמות (${P.src}).`);
   out.push(`כדאי לעבור על תיאור סוג הדמות (${P.src}) ולבדוק אם יש יכולת חדשה בדרגה ${N}.`);
   return out;
