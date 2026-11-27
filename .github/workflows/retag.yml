@@ -1,0 +1,28 @@
+# One-time helper after the history was cleaned (the adventure books were removed from every commit):
+# moves each version tag vX.Y to the rewritten commit whose message starts with "Version X.Y". Safe to run again.
+name: Re-point version tags
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/retag.yml]
+permissions:
+  contents: write
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Move tags
+        run: |
+          set -e
+          git fetch --tags --force origin
+          for t in $(git tag -l 'v*'); do
+            v=${t#v}
+            sha=$(git log --format='%H %s' origin/main | awk -v v="$v" 'index($0," Version " v)>0 {s=$1} END{print s}')
+            for c in $(git log --format='%H' origin/main); do s=$(git log -1 --format=%s "$c"); case "$s" in "Version $v"|"Version $v:"*|"Version $v "*) sha=$c; break;; esac; done
+            [ -z "$sha" ] && { echo "no commit for $t"; continue; }
+            if [ "$(git rev-list -n1 "$t")" = "$sha" ]; then echo "$t ok"; continue; fi
+            git tag -f "$t" "$sha" && git push -f origin "refs/tags/$t" && echo "moved $t to $sha"
+          done
