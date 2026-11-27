@@ -8,5 +8,5 @@ window.SW_FB={
     messagingSenderId:"397737623489",
     appId:"1:397737623489:web:adfef7a2c29f6e1399b940"
   },
-  admin:""
+  admin:"geilam@gmail.com"
 };
