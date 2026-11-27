@@ -214,7 +214,7 @@ input[type=number],input[type=text],input[type=search],select,textarea{backgroun
 .empty{color:var(--muted);font-size:.92rem;padding:12px;border:1px dashed var(--line);border-radius:8px;text-align:center}
 .foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px}
 .save-state{font-size:.78rem;color:var(--muted);margin:8px 0 0}
-.backup{position:fixed;z-index:40;top:72px;left:16px;right:16px;margin-inline:auto;max-width:760px;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.backup{position:fixed;z-index:40;top:72px;left:16px;right:16px;margin-inline:auto;max-width:760px;max-height:calc(100vh - 88px);max-height:calc(100dvh - 88px);overflow:auto;overscroll-behavior:contain;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .backup[hidden],#bkPasteBox[hidden]{display:none}
 .backup #bkClose{position:absolute;top:8px;left:8px}
 .backup .set-h{padding-left:40px}
@@ -241,7 +241,11 @@ body.ext .not-ext{display:none}
 .gm-list li.on{border-color:var(--accent)}
 .gm-list .gm-meta{flex:1 1 220px;min-width:0}
 .gm-list .gm-acts{display:flex;gap:6px}
-.gm-acct{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.set-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.set-tabs button{font:inherit;font-size:.9rem;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer;min-height:34px}
+.set-tabs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.backup [data-tab]:not(.on){display:none!important}
+.backup .set-sec{border-top:0!important;margin-top:0!important;padding-top:0!important}
 .st-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-top:6px}
 .st-tile{border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
 .st-tile b{font-size:1.25rem;line-height:1.1}.st-tile span{font-size:.8rem;color:var(--muted)}
@@ -716,8 +720,9 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
   <section class="backup" id="backupPanel" hidden aria-label="הגדרות">
     <button class="btn small ghost" id="bkClose" aria-label="סגירת חלון ההגדרות">✕</button>
     <h2 class="set-h">הגדרות</h2>
+    <div class="set-tabs" id="setTabs" role="tablist" aria-label="חלקי ההגדרות"></div>
     <div class="set-sec" id="gmSec"></div>
-    <div class="set-sec" id="bkSec">
+    <div class="set-sec" id="bkSec" data-tab="backup">
     <div class="bk-row">
       <div class="bk-txt"><b>גיבוי מידע החבורה</b> <span class="muted" id="bkSummary"></span></div>
       <div class="bk-acts">
@@ -733,7 +738,7 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
     <div id="bkPasteBox" hidden><textarea id="bkText" aria-label="טקסט הגיבוי" placeholder="הדביקו כאן טקסט גיבוי"></textarea>
       <div class="bk-acts"><button class="btn small primary" id="bkPasteGo">שחזור</button><button class="btn small ghost" id="bkPasteCancel">ביטול</button></div></div>
     </div>
-    <div class="set-sec gm-dm" id="hfSec" hidden></div>
+    <div class="set-sec gm-dm" id="hfSec" data-tab="hf" hidden></div>
   </section>
 
   <section class="charpanel" aria-label="פרטי הדמות">
@@ -1579,7 +1584,7 @@ function gameRows(list,admin){
 function renderGame(){
   const box=$("gmSec"); if(!box||!EXT) return;
   const admin=EXT.isAdmin&&EXT.isAdmin(), google=gGoogle(), online=!!dbRef, dm=MODE==="dm";
-  let h=`<h3>משחק</h3>`;
+  let h=`<div data-tab="game">`;
   if(!online) h+=`<p class="muted small">${EXT.failed?"אין חיבור לשרת המשחקים. בדקו את האינטרנט ורעננו את הדף.":"מתחבר לשרת המשחקים…"}</p>`;
   if(GAME){
     h+=`<div class="gm-row"><span>מחובר למשחק <b>${esc((GMETA&&GMETA.name)||"")}</b></span><span>קוד: <span class="gm-code">${esc(fmtCode(GAME))}</span></span>
@@ -1600,7 +1605,7 @@ function renderGame(){
   h+=`<div class="gm-row"><label for="gmCodeIn">${GAME?"מעבר למשחק אחר":"קוד משחק"}</label><input type="text" id="gmCodeIn" inputmode="numeric" maxlength="11" placeholder="12345-67890" autocomplete="off" aria-describedby="gmErr">
     <button class="btn small ${GAME?"":"primary"}" id="gmJoinBtn" ${GBUSY||!online?"disabled":""}>התחברות</button></div><p class="small" id="gmErr" role="alert" style="color:var(--bad,#b00)"></p>`;
   /* DM account */
-  h+=`<div class="gm-acct"><h3>חשבון מנחה</h3>`;
+  h+=`</div><div class="gm-acct" data-tab="acct">`;
   if(!google){
     h+=`<p class="muted small">מנחים נכנסים עם חשבון Google. אחרי הכניסה אפשר ליצור משחקים, לראות את המשחקים שלך מכל מכשיר ולעבור למצב מנחה בלי סיסמה. שחקנים לא צריכים חשבון.</p>
       <div class="gm-row"><button class="btn small" id="gmGoogle" ${online?"":"disabled"}>כניסה עם Google</button></div>`;
@@ -1615,9 +1620,9 @@ function renderGame(){
     if(list==="loading") h+=`<p class="muted small">טוען…</p>`;
     else if(list==="error") h+=`<p class="small">לא הצלחתי לטעון את הרשימה.</p>`;
     else if(Array.isArray(list)) h+=gameRows(list,admin);
-    if(admin) h+=`<div class="set-sec" id="gmStats">${statsHTML()}</div>`;
   }
-  h+=`</div><p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות באופן אנונימי (מתי, סוג המכשיר ולאיזה משחק), לצורך ניהול בלבד.</p>`;
+  h+=`<p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות באופן אנונימי (מתי, סוג המכשיר ולאיזה משחק), לצורך ניהול בלבד.</p></div>`;
+  if(google&&admin) h+=`<div id="gmStats" data-tab="stats">${statsHTML()}</div>`;
   box.innerHTML=h; bkSummary();
   const on=(id,f)=>{ const e=$(id); if(e) e.onclick=f; };
   on("gmCopy",async()=>{ try{ await navigator.clipboard.writeText(GAME); toast("הקוד הועתק"); }catch(e){ toast("הקוד: "+isoCode(GAME)); } });
@@ -1640,7 +1645,19 @@ function renderGame(){
   const sb=$("stRefresh"); if(sb) sb.onclick=statsLoad;
   if(google&&online&&(admin?GLIST:MYLIST)==null) gmLoadList();
   if(admin&&online&&STATS==null) statsLoad();
-  renderHF();
+  renderHF(); renderSetTabs();
+}
+/* the settings panel shows one part at a time; which parts exist depends on the version, the mode and the account */
+let SET_TAB="";
+function renderSetTabs(){
+  const bar=$("setTabs"); if(!bar) return;
+  const dm=MODE==="dm", admin=!!(EXT&&EXT.isAdmin&&EXT.isAdmin()&&gGoogle());
+  const tabs=EXT?[["game","משחק"],["acct","חשבון מנחה"],...(admin&&dm?[["stats","כניסות"]]:[]),...(dm?[["backup","גיבוי"],["hf","איורים"]]:[])]:[["backup","גיבוי"]];
+  if(!tabs.some(t=>t[0]===SET_TAB)) SET_TAB=tabs[0][0];
+  bar.hidden=tabs.length<2;
+  bar.innerHTML=tabs.map(([k,l])=>`<button type="button" role="tab" data-st="${k}" aria-selected="${k===SET_TAB}">${l}</button>`).join("");
+  bar.querySelectorAll("[data-st]").forEach(b=>b.onclick=()=>{ SET_TAB=b.dataset.st; renderSetTabs(); });
+  $("backupPanel").querySelectorAll("[data-tab]").forEach(e=>e.classList.toggle("on",e.dataset.tab===SET_TAB));
 }
 async function gSignIn(){
   try{ await EXT.signInGoogle(); }
@@ -1684,7 +1701,7 @@ async function statsLoad(){
   const b2=$("gmStats"); if(b2){ b2.innerHTML=statsHTML(); const r=$("stRefresh"); if(r) r.onclick=statsLoad; }
 }
 function statsHTML(){
-  let h=`<div class="gm-row"><h3 style="margin:0">כניסות לאפליקציה</h3><button class="btn small" id="stRefresh">רענון</button></div>`;
+  let h=`<div class="gm-row"><span class="muted small">30 הימים האחרונים</span><button class="btn small" id="stRefresh">רענון</button></div>`;
   if(STATS==null||STATS==="loading") return h+`<p class="muted small">טוען…</p>`;
   if(STATS==="error") return h+`<p class="small">לא הצלחתי לטעון את הנתונים.</p>`;
   const V=STATS, now=Date.now(), day=864e5, dkey=t=>new Date(t).toLocaleDateString("en-CA");
@@ -1983,7 +2000,7 @@ function modeDlg(title,body,acts){
 }
 let MG_OPEN=false;
 function modeClose(){ $("modeScrim").hidden=true; MG_OPEN=false; }
-function setMode(m){ MODE=m; if(m==="player"&&!EXT&&!$("backupPanel").hidden){ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); } applyView(); renderAll(); renderGame(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
+function setMode(m){ MODE=m; if(m==="player"&&!EXT&&!$("backupPanel").hidden){ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); } applyView(); renderAll(); renderGame(); renderSetTabs(); toast(m==="dm"?"עברת למצב מנחה":"עברת למצב שחקנים"); }
 $("modeBtn").onclick=()=>{
   if(EXT&&GAME) return modeGame();
   if(MODE==="player"){
@@ -2943,7 +2960,7 @@ function restoreFrom(txt){
   ask("לשחזר מהגיבוי?",`בגיבוי${when?" מ־"+when:""}: ${r.s.chars.map(c=>c.name).join(", ")}. כל ${state.chars.length} הדמויות שבמכשיר הזה יוחלפו.`,"שחזור",()=>{
     state=r.s; for(const c of state.chars){ if(c.portrait) c.porV=Date.now().toString(36)+c.id.slice(-3); else delete c.porV; } schedule(); renderAll(); bkSummary(); $("bkPasteBox").hidden=true; $("bkText").value=""; $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); toast("החבורה שוחזרה מהגיבוי");});
 }
-$("backupBtn").onclick=()=>{const p=$("backupPanel");p.hidden=!p.hidden;$("backupBtn").setAttribute("aria-expanded",String(!p.hidden));if(!p.hidden){bkSummary();renderGame();}};
+$("backupBtn").onclick=()=>{const p=$("backupPanel");p.hidden=!p.hidden;$("backupBtn").setAttribute("aria-expanded",String(!p.hidden));if(!p.hidden){bkSummary();renderGame();renderSetTabs();}};
 $("bkSave").onclick=async()=>{
   const data=backupJSON(), name=bkName(); let dl=null;
   try{dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;}catch(e){dl=null;}
