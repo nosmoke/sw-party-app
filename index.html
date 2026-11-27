@@ -938,8 +938,9 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
       <section class="sbox" id="shSkillsBox"><h3 id="shSkillsTitle"></h3><div id="shSkills"></div></section>
       <section class="sbox" id="shSpellsBox"><h3>לחשים ביום</h3><div id="shSpells"></div></section>
       <section class="sbox sh-wide" id="shBookBox" hidden><h3 id="shBookTitle">ספר הלחשים <small><span id="shBookCount"></span> · ש 30–36</small></h3>
+        <p class="muted" id="shBookNone" hidden></p>
         <div id="shBook"></div>
-        <div class="bk-foot"><button class="btn small" id="bookPickBtn">הוספת לחשים לספר</button><span class="muted small">לחשים חדשים מוצאים במגילות ובספרים. העתקה לספר: בערך יום לכל עוצמה, ו־10% שהמגילה תושמד (מ 37).</span></div>
+        <div class="bk-foot" id="shBookFoot"><button class="btn small" id="bookPickBtn">הוספת לחשים לספר</button><span class="muted small">לחשים חדשים מוצאים במגילות ובספרים. העתקה לספר: בערך יום לכל עוצמה, ו־10% שהמגילה תושמד (מ 37).</span></div>
         <div id="bookPick" hidden></div></section>
       <section class="sbox" id="shTurnBox"><h3 id="shTurnTitle">גירוש אל־מתים <small>ש 26</small></h3><div id="shTurn"></div></section>
       <section class="sbox sh-wide"><h3>ציוד וכסף <small>מהחנות</small></h3><div id="shGear"></div></section>
@@ -3071,10 +3072,21 @@ document.addEventListener("toggle",e=>{const d=e.target; if(!(d instanceof HTMLD
   SP_TXT_P.then(fill).catch(()=>{SP_TXT_P=null; box.textContent="לא הצלחתי לטעון את הטקסט המלא. בדקו חיבור לרשת.";});},true);
 /* wizards copy spells of power 6+ only into a special book (מת' 15–16) */
 const BOOK_NEED={6:["spellbook6","ספר לחשים עמיד"],7:["spellbook7","ספר לחשים מיוחד"],8:["spellbook8","ספר לחשים קמאי"]};
+/* a book caster without a spellbook among the owned gear has no book to read or write in (ש 30, מת' 15) */
+const BOOK_IDS=["spellbook","spellbook6","spellbook7","spellbook8"];
+const hasBook=c=>BOOK_IDS.some(id=>hasI(c,id));
 function renderBook(){
   const c=cur(), box=$("shBookBox"); const ok=isBookCls(c); box.hidden=!ok; if(!ok) return;
   if(!Array.isArray(c.book)) c.book=[];
   const L=lvlOf(c), m=mods(c), P=PROG[c.cls], tat=!!P.tattoos;
+  const noBook=!tat&&!hasBook(c), nb=$("shBookNone");
+  nb.hidden=!noBook; $("shBook").hidden=noBook; $("shBookFoot").hidden=noBook; if(noBook) $("bookPick").hidden=true;
+  if(noBook){
+    $("shBookTitle").innerHTML=`ספר הלחשים <small>ש 30 · מת' 15</small>`;
+    const n=(c.book||[]).filter(id=>WSP_BY[id]).length, inCart=BOOK_IDS.some(id=>(c.cart||[]).some(l=>l.ref===id&&l.qty>0));
+    nb.textContent=`אין ספר לחשים בציוד של ${c.name||"הדמות"}, ולכן אין ספר לחשים לכתוב בו או להכין ממנו לחשים. ${inCart?"ספר הלחשים נמצא בסל, ויופיע כאן אחרי הקנייה.":"אפשר לקנות \"ספר לחשים ריק\" בחנות הציוד."}${n?` ${n} הלחשים שהיו רשומים בספר שמורים, ויחזרו כשיהיה ספר.`:""}`;
+    return;
+  }
   const castable=spRow(P,L);
   const cap=lv=>castable[lv-1]||0;
   const canCast=lv=>cap(lv)>0||(!tat&&lv===1&&m.intBonus>0);
@@ -3248,7 +3260,7 @@ const SPELL_BY=id=>WSP_BY[id]||DSP_BY[id];
 /* which spells a caster can prepare today: wizards and elves from their spellbook (ש 30, 37); clerics, paladins and druids from their whole list (ש 26, מת' 30, 35) */
 function spellPool(c){
   const m=mods(c);
-  if(isBookCls(c)) return (c.book||[]).map(id=>WSP_BY[id]).filter(s=>s&&s[0]<=m.intMax);
+  if(isBookCls(c)) return (!PROG[c.cls].tattoos&&!hasBook(c))?[]:(c.book||[]).map(id=>WSP_BY[id]).filter(s=>s&&s[0]<=m.intMax);
   const tag=c.cls==="cleric"?"c":c.cls==="paladin"?"p":c.cls==="druid"?"d":c.cls==="stonew"?"s":null; if(!tag) return [];
   return DSP.filter(s=>s[7].includes(tag)&&s[0]<=(m.wisMax||9));
 }
@@ -3256,6 +3268,7 @@ const prepOf=(c,lv,s)=>(c.prep||[]).find(p=>p.lv===lv&&p.s===s);
 function prepHTML(c,sl){
   const pool=spellPool(c), L=lvlOf(c), cb=adv().combat, hurt=cb&&cb.hurt&&cb.hurt[c.id]===cb.round;
   const isBook=isBookCls(c);
+  if(isBook&&!PROG[c.cls].tattoos&&!hasBook(c)) return `<div class="prep"><span class="muted small">אין ספר לחשים בציוד, ולכן אין ממה להכין לחשים.</span></div>`;
   if(isBook&&!pool.length) return `<div class="prep"><span class="muted small">אין לחשים בספר הלחשים. מוסיפים בדף הדמות.</span></div>`;
   let h=`<div class="prep"><div class="prep-h"><b class="small">לחשים להיום</b><span class="muted small">${isBook?"מהספר; אפשר להכין לחש יותר מפעם אחת":"מהרשימה; אפשר להכין לחש יותר מפעם אחת"}</span></div>`;
   sl.forEach((n,i)=>{ if(!n) return; const lv=i+1, opts=pool.filter(s=>s[0]===lv);
