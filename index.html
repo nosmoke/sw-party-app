@@ -1850,7 +1850,7 @@ function renderGame(){
     else if(list==="error") h+=`<p class="small">לא הצלחתי לטעון את הרשימה.</p>`;
     else if(Array.isArray(list)) h+=gameRows(list,admin);
   }
-  h+=`<p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות באופן אנונימי (מתי, סוג המכשיר ולאיזה משחק), לצורך ניהול בלבד.</p></div>`;
+  h+=`<p class="muted small" style="margin-top:10px">האפליקציה סופרת כניסות לצורך ניהול בלבד.</p></div>`;
   if(google&&admin) h+=`<div id="gmStats" data-tab="stats">${statsHTML()}</div><div id="gmDms" data-tab="dms"></div>`;
   if(online) h+=`<div id="gmLib" data-tab="lib"></div>`;
   box.innerHTML=h; bkSummary();
