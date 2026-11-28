@@ -304,7 +304,17 @@ body.bked-open .scrim{z-index:80}
 .lib-prev{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px;background:var(--panel)}
 .lib-prev h4{margin:0 0 6px}.lib-pc{padding:6px 0;border-top:1px dashed var(--line)}.lib-pc:first-of-type{border-top:0}
 .lib-er{color:#a3271d;margin:4px 0;padding-inline-start:18px;font-size:.85rem}.lib-wn{margin:4px 0;padding-inline-start:18px;font-size:.85rem;color:#6b5a2e}
-.btn.mode{font-weight:600}.app.dm .btn.mode{border-color:var(--accent);color:var(--accent)}
+/* mode switch */
+.mode-sw{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font:600 .85rem/1 var(--font-body);color:var(--ink,inherit);white-space:nowrap}
+.mode-sw:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ms-l{opacity:.5;transition:opacity .15s}.mode-sw[aria-checked="false"] .ms-l.pl,.mode-sw[aria-checked="true"] .ms-l.dm{opacity:1}
+.ms-track{position:relative;width:38px;height:20px;border-radius:999px;background:#9aa3a6;transition:background .2s;flex:0 0 auto}
+.ms-knob{position:absolute;top:2px;inset-inline-start:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:inset-inline-start .2s}
+.mode-sw[aria-checked="true"] .ms-track{background:#8a4b0f}.mode-sw[aria-checked="true"] .ms-knob{inset-inline-start:20px}
+.mode-sw[aria-checked="true"]{border-color:#8a4b0f}
+@media (prefers-reduced-motion:reduce){.ms-track,.ms-knob,.ms-l{transition:none}}
+/* DM mode: a strip along the top of the screen, so the mode is clear everywhere */
+.app.dm::before{content:"";position:fixed;top:0;left:0;right:0;height:4px;background:#8a4b0f;z-index:65;pointer-events:none}
 .frozen-note{margin:0;padding:8px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);font-size:.9rem}
 .frozen-note[hidden]{display:none}
 .app.frozen #leftPane button:disabled,.app.frozen #cartPane button:disabled,.app.frozen #sheetPane button:disabled,.app.frozen .charpanel button:disabled{opacity:.45;cursor:not-allowed}
@@ -818,7 +828,7 @@ header.top .btn.ico{min-width:36px;padding-inline:8px;font-size:1rem;line-height
     </div>
     <div class="chartabs" id="charTabs" role="tablist" aria-label="דמויות"></div>
     <div class="tools">
-    <button class="btn small mode" id="modeBtn" aria-haspopup="dialog"></button>
+    <button class="mode-sw" id="modeBtn" role="switch" aria-checked="false"></button>
     <button class="btn small ico" id="themeBtn" title="מראה: אוטומטי לפי המכשיר, בהיר או כהה"></button>
     <button class="btn small ico" id="backupBtn" aria-expanded="false" aria-controls="backupPanel" title="הגדרות" aria-label="הגדרות">⚙</button>
     <button class="btn small ico" id="collapseBtn" title="מזעור: להשאיר רק שורת סיכום קטנה" aria-label="מזעור">▴</button>
@@ -2782,8 +2792,11 @@ const advRunning=()=>!!(state.quest&&state.quest.active)||!!(state.adv&&(state.a
 const frozen=()=>MODE==="player"&&advRunning();
 /* a twenty-sided die, the game's own die, in place of the six-sided emoji */
 function d20(){ return '<svg class="d20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2L21 7V17L12 22L3 17V7Z M12 6.5L17.2 15.5H6.8Z M12 2V6.5 M3 7L12 6.5L21 7 M3 7L6.8 15.5 M21 7L17.2 15.5 M3 17L6.8 15.5 M21 17L17.2 15.5 M12 22L6.8 15.5 M12 22L17.2 15.5"/></svg>'; }
-function renderModeBtn(){ const b=$("modeBtn"); if(!b) return; b.innerHTML=MODE==="dm"?"🛡 מצב מנחה":d20()+" מצב שחקנים";
-  b.title=MODE==="dm"?"חזרה למצב שחקנים":(GAME?"מעבר למצב מנחה (למנחי המשחק שמחוברים עם Google)":"מעבר למצב מנחה (דורש כניסה עם Google)"); }
+/* the mode switch: players on one side, DM on the other; the knob sits on the side that is on */
+function renderModeBtn(){ const b=$("modeBtn"); if(!b) return; const dm=MODE==="dm";
+  b.innerHTML=`<span class="ms-l pl">שחקנים</span><span class="ms-track" aria-hidden="true"><span class="ms-knob"></span></span><span class="ms-l dm">מנחה</span>`;
+  b.setAttribute("aria-checked",String(dm)); b.setAttribute("aria-label","מצב מנחה");
+  b.title=dm?"מצב מנחה. לחיצה מחזירה למצב שחקנים":(GAME?"מצב שחקנים. לחיצה עוברת למצב מנחה (למנחי המשחק שמחוברים עם Google)":"מצב שחקנים. לחיצה עוברת למצב מנחה (דורש כניסה עם Google)"); }
 function modeDlg(title,body,acts){
   $("modeTitle").textContent=title; $("modeBody").innerHTML=body; $("modeErr").textContent="";
   const a=$("modeActs"); a.innerHTML="";
@@ -2796,11 +2809,7 @@ function setMode(m){ MODE=m; if(m==="dm") for(const k in QBOOKS) if(QBOOKS[k]._p
 $("modeBtn").onclick=()=>modeGame();
 /* DM mode always needs a Google sign-in; in a game, the account must also be one of the game's DMs */
 function modeGame(){
-  if(MODE==="dm"){
-    modeDlg("מצב מנחה",`<p>במצב מנחה כל המסכים פתוחים, ואפשר לשנות הכול גם בזמן הרפתקה. בכל פתיחה האפליקציה חוזרת למצב שחקנים.</p><p class="muted small">מחובר כ־<span style="direction:ltr;unicode-bidi:isolate">${esc(EXT.email())}</span></p>`,
-      [["חזרה למצב שחקנים","primary",()=>{modeClose();setMode("player");}],["סגירה","",modeClose]]);
-    return;
-  }
+  if(MODE==="dm"){ modeClose(); setMode("player"); return; }
   const g=gGoogle();
   if(!EXT){ modeDlg("מעבר למצב מנחה",`<p>מצב מנחה דורש כניסה עם חשבון Google, ואין כרגע חיבור לשרת. בודקים את החיבור לאינטרנט ומנסים שוב.</p>`,[["סגירה","primary",modeClose]]); return; }
   if(g&&(!GAME||gIsDM())){ modeClose(); setMode("dm"); return; }
