@@ -268,7 +268,7 @@ body.bked-open .scrim{z-index:80}
 .me-poly{fill:rgba(47,110,180,.12);stroke:rgba(47,110,180,.65);stroke-width:1.5;vector-effect:non-scaling-stroke;cursor:pointer}
 .me-poly.on{fill:rgba(214,120,20,.28);stroke:#c46a00;stroke-width:2.5;cursor:move}.me-poly.on.sel{fill:rgba(214,120,20,.4)}
 .me-hl{fill:rgba(214,120,20,.10);stroke:#c46a00;stroke-width:3;stroke-dasharray:8 5;vector-effect:non-scaling-stroke;pointer-events:none}
-.me-hlab{position:absolute;transform:translate(-50%,-50%);font:700 .85rem/1 var(--font-body);color:#fff;background:#c46a00;padding:3px 7px;border-radius:999px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.me-hlab{position:absolute;transform:translate(-50%,calc(-100% - 6px));opacity:.65;font:700 .85rem/1 var(--font-body);color:#fff;background:#c46a00;padding:3px 7px;border-radius:999px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .me-tmp{fill:rgba(214,120,20,.18);stroke:#c46a00;stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
 .me-v,.me-m{position:absolute;transform:translate(-50%,-50%);border-radius:50%;box-sizing:border-box}
 .me-v{width:14px;height:14px;background:#fff;border:2.5px solid #c46a00;cursor:grab;z-index:3}.me-v.sel{background:#c46a00}
@@ -279,7 +279,7 @@ body.bked-open .scrim{z-index:80}
 .me-pin{cursor:grab;touch-action:none}.me-pin.lk{opacity:.55;cursor:not-allowed}.me-pin.ghost{opacity:.5;pointer-events:none;background:#6b7578}
 .me-patch{position:absolute;outline:1.5px dashed rgba(47,110,180,.8);cursor:pointer}.me-patch img{width:100%;height:100%;display:block;pointer-events:none;opacity:.92}
 .me-patch.on{outline:2.5px solid #c46a00;cursor:move}.me-patch.lk{cursor:not-allowed}
-.me-plab{position:absolute;top:2px;left:2px;font:700 .72rem/1 var(--font-body);background:#c46a00;color:#fff;padding:2px 4px;border-radius:3px}
+.me-plab{position:absolute;bottom:100%;left:16px;margin-bottom:4px;opacity:.65;font:700 .72rem/1 var(--font-body);background:#c46a00;color:#fff;padding:2px 4px;border-radius:3px}
 .me-c{position:absolute;width:14px;height:14px;background:#fff;border:2.5px solid #c46a00;border-radius:3px}
 .me-c.nw{left:-7px;top:-7px;cursor:nwse-resize}.me-c.ne{right:-7px;top:-7px;cursor:nesw-resize}.me-c.sw{left:-7px;bottom:-7px;cursor:nesw-resize}.me-c.se{right:-7px;bottom:-7px;cursor:nwse-resize}
 :root[data-theme="dark"] .me-in:not(.pv) img,:root[data-theme="dark"] .me-th img{filter:invert(.88) hue-rotate(180deg)}
@@ -4979,7 +4979,10 @@ function meOverlay(){
     /* the players' map has no numbers: outline the chosen room (its area, or its pin when it has none) */
     const hl=(meRegs()[ME.room]||[]).filter(q=>q&&q.length>=3), pin=(ME.d.pins||{})[ME.room];
     h=(hl.length?`<svg class="me-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${hl.map(q=>`<polygon points="${mePts(q)}" class="me-hl"/>`).join("")}</svg>`:"")
-      +(ME.room&&(hl.length||pin)?(()=>{ const c=hl.length?meCentroid(hl[0]):pin; return `<span class="me-hlab" style="left:${c[0]}%;top:${c[1]}%">${esc(ME.room)}</span>`; })():"")
+      +(ME.room&&(hl.length||pin)?(()=>{ /* the number sits above the outline, not on what a patch may need to cover */
+          if(!hl.length) return `<span class="me-hlab out" style="left:${pin[0]}%;top:${pin[1]}%">${esc(ME.room)}</span>`;
+          let x0=100,y0=100,x1=0; for(const q of hl) for(const [x,y] of q){ x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); }
+          return `<span class="me-hlab" style="left:${(x0+x1)/2}%;top:${y0}%">${esc(ME.room)}</span>`; })():"")
       +L.map((x,i)=>{ const [a,b,c,d]=x.box, on=ME.patch===i, src=meSrc(x.file);
       return `<div class="me-patch${on?" on":""}${meLocked(x.room)?" lk":""}" style="left:${a}%;top:${b}%;width:${c-a}%;height:${d-b}%" data-pt="${i}">${src?`<img src="${src}" alt="">`:""}<span class="me-plab">${esc(x.room)}</span>
         ${on&&!meLocked(x.room)?["nw","ne","sw","se"].map(k=>`<span class="me-c ${k}" data-c="${k}"></span>`).join(""):""}</div>`; }).join("");
