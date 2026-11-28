@@ -302,6 +302,7 @@ body.bked-open .scrim{z-index:80}
 @media (max-width:760px){.me-main{flex-direction:column}.me-side{width:auto;max-height:38vh;border-inline-end:0;border-bottom:1px solid var(--line)}}
 
 .bked-box{background:var(--bg);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);width:min(980px,100%);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+.ed-note{margin:0;padding:10px 14px 0}
 .bked-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
 .bked-top select{flex:1;min-width:160px;max-width:420px}.bked-acts{display:flex;gap:6px;margin-inline-start:auto}
 .bked-body{overflow:auto;padding:10px 14px 18px}.bked-body h2{margin:4px 0 8px}
@@ -4827,7 +4828,7 @@ function edRender(){
       <span class="bked-acts">${ED.edit&&can&&!locked?`<button class="btn small primary" data-ed="save">שמירה</button><button class="btn small" data-ed="cancel">ביטול</button>`
         :`${can&&!locked?`<button class="btn small" data-ed="edit">✎ עריכה</button>`:""}${can?`<button class="btn small" data-ed="map">🗺 עריכת המפה</button>`:""}${ED.mode==="browse"?`<button class="btn small ghost" data-ed="prev" title="הקודם">‹</button><button class="btn small ghost" data-ed="next" title="הבא">›</button>`:""}<button class="btn small ghost" data-ed="close" aria-label="סגירה">✕</button>`}</span></div>
     ${locked?`<p class="ed-lock">החדר הזה סומן "נוקה" במשחק הנוכחי, ולכן נעול לעריכה כאן. אפשר לערוך אותו בעיון בספר מהספרייה (הגדרות ← ספרייה).</p>`:""}
-    ${!can&&ED.mode==="browse"?`<p class="muted small">רק מי שהעלה את הספר יכול לערוך אותו.</p>`:""}
+    ${!can&&ED.mode==="browse"?`<p class="muted small ed-note">רק מי שהעלה את הספר יכול לערוך אותו.</p>`:""}
     <div class="bked-body">${body}</div></div>`;
   if(ED.edit&&!locked){ const fst=o.querySelector(".ed-form input,.ed-form textarea"); if(fst) fst.focus(); }
 }
