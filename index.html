@@ -281,6 +281,8 @@ body.bked-open .scrim{z-index:80}
 .me-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .me-poly{fill:rgba(47,110,180,.12);stroke:rgba(47,110,180,.65);stroke-width:1.5;vector-effect:non-scaling-stroke;cursor:pointer}
 .me-poly.on{fill:rgba(214,120,20,.28);stroke:#c46a00;stroke-width:2.5;cursor:move}.me-poly.on.sel{fill:rgba(214,120,20,.4)}
+.me-hl{fill:rgba(214,120,20,.10);stroke:#c46a00;stroke-width:3;stroke-dasharray:8 5;vector-effect:non-scaling-stroke;pointer-events:none}
+.me-hlab{position:absolute;transform:translate(-50%,-50%);font:700 .85rem/1 var(--font-body);color:#fff;background:#c46a00;padding:3px 7px;border-radius:999px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .me-tmp{fill:rgba(214,120,20,.18);stroke:#c46a00;stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
 .me-v,.me-m{position:absolute;transform:translate(-50%,-50%);border-radius:50%;box-sizing:border-box}
 .me-v{width:14px;height:14px;background:#fff;border:2.5px solid #c46a00;cursor:grab;z-index:3}.me-v.sel{background:#c46a00}
@@ -4988,7 +4990,11 @@ function meOverlay(){
     h=`<svg class="me-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>${lab}${hd}`;
   } else if(ME.layer==="patches"){
     const L=(meP()&&meP().patches)||[];
-    h=L.map((x,i)=>{ const [a,b,c,d]=x.box, on=ME.patch===i, src=meSrc(x.file);
+    /* the players' map has no numbers: outline the chosen room (its area, or its pin when it has none) */
+    const hl=(meRegs()[ME.room]||[]).filter(q=>q&&q.length>=3), pin=(ME.d.pins||{})[ME.room];
+    h=(hl.length?`<svg class="me-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${hl.map(q=>`<polygon points="${mePts(q)}" class="me-hl"/>`).join("")}</svg>`:"")
+      +(ME.room&&(hl.length||pin)?(()=>{ const c=hl.length?meCentroid(hl[0]):pin; return `<span class="me-hlab" style="left:${c[0]}%;top:${c[1]}%">${esc(ME.room)}</span>`; })():"")
+      +L.map((x,i)=>{ const [a,b,c,d]=x.box, on=ME.patch===i, src=meSrc(x.file);
       return `<div class="me-patch${on?" on":""}${meLocked(x.room)?" lk":""}" style="left:${a}%;top:${b}%;width:${c-a}%;height:${d-b}%" data-pt="${i}">${src?`<img src="${src}" alt="">`:""}<span class="me-plab">${esc(x.room)}</span>
         ${on&&!meLocked(x.room)?["nw","ne","sw","se"].map(k=>`<span class="me-c ${k}" data-c="${k}"></span>`).join(""):""}</div>`; }).join("");
   }
@@ -5023,7 +5029,7 @@ function meBind(st){
       else D.kind="pan";
     } else if(ME.layer==="patches"){
       const c=t.closest("[data-c]"), pt=t.closest("[data-pt]");
-      if(pt){ const i=+pt.dataset.pt, x=meP().patches[i]; if(ME.patch!==i){ ME.patch=i; meRender(); return; } if(meLocked(x.room)){ lockMsg(x.room); return; }
+      if(pt){ const i=+pt.dataset.pt, x=meP().patches[i]; if(ME.patch!==i){ ME.patch=i; ME.room=x.room; meRender(); return; } if(meLocked(x.room)){ lockMsg(x.room); return; }
         D.kind=c?"corner":"patch"; D.c=c&&c.dataset.c; D.orig=x.box.slice(); }
       else D.kind="pan";
     } else D.kind="pan";
@@ -5112,7 +5118,7 @@ function meClick(e){
   if(a==="delpin"){ if(meLocked(ME.room)) return; mePush(); delete ME.d.pins[ME.room]; return meRender(); }
   if(a==="delv") return meDelVertex();
   if(a==="delpoly"){ const s=ME.sel, regs=meRegs(); if(!s||s.p==null||!regs[ME.room]||meLocked(ME.room)) return; mePush(); regs[ME.room].splice(s.p,1); if(!regs[ME.room].length) delete regs[ME.room]; ME.sel=null; return meRender(); }
-  if(a==="patch"){ ME.patch=+t.dataset.i; meRender(); meFocusRoom(); return; }
+  if(a==="patch"){ ME.patch=+t.dataset.i; const x=meP().patches[ME.patch]; if(x) ME.room=x.room; meRender(); meFocusRoom(); return; }
   if(a==="iv"){ ME.iv=t.dataset.v; return meRender(); }
   if(a==="addpatch") return meAddPatch();
   if(a==="delpatch"){ const L=meP().patches; ask("למחוק את המדבקה?",`המדבקה של חדר ${L[ME.patch].room} תימחק מהמפה.`,"מחיקה",()=>{ mePush(); L.splice(ME.patch,1); if(!L.length) delete meP().patches; ME.patch=null; meRender(); }); return; }
@@ -5122,7 +5128,7 @@ function meClick(e){
 function meChange(e){
   const t=e.target.closest("[data-me]"); if(!t) return; const a=t.dataset.me;
   if(a==="pv"){ ME.pv=t.value; ME.tool=null; ME.tmp=null; return meRender(); }
-  if(a==="proom"){ mePush(); meP().patches[ME.patch].room=t.value; return meRender(); }
+  if(a==="proom"){ mePush(); meP().patches[ME.patch].room=ME.room=t.value; meRender(); meFocusRoom(); return; }
   if(a==="newroom"){ ME.room=t.value; meRender(); meFocusRoom(); return; }
   if(a==="f"){ mePush(); const v=t.value.trim(), k=t.dataset.k; if(k==="players.note"){ if(v) meP().note=v; else delete meP().note; } else if(v) ME.d[k]=v; else delete ME.d[k]; $("meEd").querySelector('[data-me="save"]').disabled=false; return; }
 }
