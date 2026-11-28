@@ -5664,11 +5664,12 @@ function questInit(){
         const cx=v?(v.scrollLeft+v.clientWidth/2)/v.scrollWidth:.5, cy=v?(v.scrollTop+v.clientHeight/2)/v.scrollHeight:.5;
         QZOOM=d===0?1:Math.max(1,Math.min(4,+(QZOOM*(d>0?1.5:1/1.5)).toFixed(2))); if(QZOOM<1.05) QZOOM=1; if(old===QZOOM) return;
         renderQuest(); const n=$("qMapView"); if(n){n.scrollLeft=cx*n.scrollWidth-n.clientWidth/2; n.scrollTop=cy*n.scrollHeight-n.clientHeight/2;} return;}
-      case "room": QMAP=false; s.cur=t.dataset.id||null; if(s.cur){const r2=roomSt(b.id,s.cur);
-          if(!r2.st){ r2.st="seen"; const rm=adv().roomMin; if(rm){ toast(`חדר חדש: עברו ${rm} דקות`); advTime(rm*60,RREF(s.cur)); } }}   /* exploring a new room takes time, when the tracker has a time per room */
+      case "room": QMAP=false; s.cur=t.dataset.id||null;   /* opening a room only shows it; the DM marks "ביקרו" by hand */
         schedule(); renderQuest(); $("qDetail")&&($("qDetail").scrollTop=0); return;
       case "time": advTime(Number(t.dataset.n)||600); break;
-      case "st": rs.st=t.dataset.v; break;
+      case "st": { const was=rs.st; rs.st=t.dataset.v;
+        /* the first time a room is marked visited or cleared, exploring it takes time, when the tracker has a time per room */
+        if(!was&&rs.st){ const rm=adv().roomMin; if(rm){ toast(`חדר חדש: עברו ${rm} דקות`); advTime(rm*60,RREF(room.id)); } } break; }
       case "kill": {const m=qAdj(b,room).mons[i]; if(!m) return; rs.killed[m.name]=Math.max(0,Math.min(m.count||1,(rs.killed[m.name]||0)+Number(t.dataset.d))); break;}
       case "fight": qFight(b,room,RREF(room.id,room.name)); return;
       case "evfight": {const ev=room.events[i], from=(b.rooms||[]).find(x=>x.id===ev.fight.from); if(!from) return;
