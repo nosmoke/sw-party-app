@@ -5296,7 +5296,7 @@ async function libPut(entry,everyone,say){
   const at=new Date().toISOString();
   const meta={title:String(book.title).slice(0,80),source:String(book.source||"").slice(0,120),levels:String(book.levels||"").slice(0,40),
     owner:old?old.owner:EXT.uid(),ownerEmail:old?old.ownerEmail:gEmail(),everyone:old?!!old.everyone:!!(everyone&&EXT.isAdmin()),
-    ready:false,savedAt:at,pub:JSON.stringify(pub),imgs:Object.values(key),rg:(old&&old.rg)||{},readers:(old&&old.readers)||[]};
+    ready:false,savedAt:at,pub:JSON.stringify(pub),imgs:Object.values(key),rg:(old&&old.rg)||{},sh:(old&&old.sh)||[],readers:(old&&old.readers)||[]};
   await dbRef.doc("books/"+id).set(meta);
   let n=0; for(const [path,k] of Object.entries(key)){ say(`${book.title}: תמונה ${++n} מתוך ${Object.keys(key).length}`);
     const d=await libFitImg(String(images[path]||"")); if(!d) throw new Error("תמונה גדולה מדי: "+path);
@@ -5318,7 +5318,7 @@ async function libSyncReaders(){
       if(b.owner!==EXT.uid()||b.everyone) continue;
       const rg=Object.assign({},b.rg||{}); if(JSON.stringify((rg[GAME]||[]).slice().sort())===JSON.stringify(want)) continue;
       if(want.length) rg[GAME]=want; else delete rg[GAME];
-      await ref.update({rg,readers:[...new Set(Object.values(rg).flat())].slice(0,200)});
+      await ref.update({rg,readers:libReaders({rg,sh:b.sh})});
     }catch(e){ console.warn("book sharing",e); LIB_SYNC=""; }
   }
 }
@@ -5449,20 +5449,44 @@ function libDelete(id,title){
     catch(e){ toast("המחיקה נכשלה"); }
     libLoad(); });
 }
+/* sharing a book: the owner (or the manager) gives named Google accounts full read access. The owner stays the only one who edits.
+   sh is the list; readers (what the rules read) is sh together with the DMs of games that use the book (rg) */
+const libReaders=b=>[...new Set([...Object.values(b.rg||{}).flat(),...(b.sh||[])].map(x=>String(x).toLowerCase()))].slice(0,200);
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function libShare(id){
+  const b=(LIB||[]).find(x=>x.id===id); if(!b) return; let sh=[...(b.sh||[])];
+  const paint=()=>{ $("modeBody").innerHTML=`<p class="small">מי שהספר משותף איתו רואה אותו בספרייה ויכול לעיין בו, לצפות במפה ולהריץ אותו במשחק. רק ${b.owner===EXT.uid()?"את/ה":"מי שהעלה אותו"} (והמנהל) יכולים לערוך.</p>
+      <ul class="gm-list">${sh.map((e,i)=>`<li><div class="gm-meta"><bdi>${esc(e)}</bdi></div><div class="lib-acts"><button class="btn small" data-sh-rm="${i}">הסרה</button></div></li>`).join("")||'<li class="muted small">הספר לא משותף עם אף אחד.</li>'}</ul>
+      <label class="ed-f wide"><span>שיתוף עם חשבון Google (כתובת מייל)</span><input type="email" id="shIn" dir="ltr" autocomplete="off" placeholder="name@gmail.com"></label>
+      ${b.everyone?`<p class="muted small">הספר כבר פתוח לכל המנחים, ולכן השיתוף לא משנה כרגע. הוא יחזור לפעול אם הספר לא יהיה פתוח לכולם.</p>`:""}`;
+    $("modeBody").querySelectorAll("[data-sh-rm]").forEach(x=>x.onclick=()=>{ sh.splice(+x.dataset.shRm,1); paint(); });
+    const inp=$("shIn"); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); } }; inp.focus(); };
+  const add=()=>{ const v=$("shIn").value.trim().toLowerCase(); $("modeErr").textContent="";
+    if(!v) return; if(!EMAIL_RE.test(v)){ $("modeErr").textContent="הכתובת לא נראית כמו כתובת מייל"; return; }
+    if(v===String(b.ownerEmail||"").toLowerCase()) { $("modeErr").textContent="זה החשבון של מי שהעלה את הספר"; return; }
+    if(sh.includes(v)){ $("modeErr").textContent="הספר כבר משותף עם החשבון הזה"; return; }
+    if(sh.length>=50){ $("modeErr").textContent="אפשר לשתף עם 50 חשבונות לכל היותר"; return; }
+    sh.push(v); paint(); };
+  const save=async()=>{ const v=$("shIn").value.trim(); if(v){ add(); if($("modeErr").textContent) return; }
+    try{ const nb=Object.assign({},b,{sh}); await dbRef.doc("books/"+id).update({sh,readers:libReaders(nb)}); modeClose(); toast(sh.length?`הספר משותף עם ${sh.length} ${sh.length===1?"חשבון":"חשבונות"}`:"הספר לא משותף עם אף אחד"); QINDEX=null; libLoad(); }
+    catch(e){ console.warn(e); $("modeErr").textContent="השמירה נכשלה. בדקו את החיבור ונסו שוב"; } };
+  modeDlg(`שיתוף: ${b.title||id}`,"",[["שמירה","primary",save],["הוספה","",add],["ביטול","",modeClose]]); paint();
+}
 async function libEvery(id,on){ try{ await dbRef.doc("books/"+id).update({everyone:!!on}); QINDEX=null; toast(on?"ההרפתקה פתוחה עכשיו לכל המנחים":"ההרפתקה זמינה עכשיו רק לך"); }catch(e){ toast("השינוי נכשל"); } libLoad(); }
 function libPaint(){
   const box=$("gmLib"); if(!box) return; const admin=EXT&&EXT.isAdmin();
   if(!gGoogle()){ box.innerHTML=`<p class="muted small">ספריית ההרפתקאות פתוחה למנחים שנכנסו עם Google (בלשונית "חשבון מנחה").</p>`; return; }
-  let h=`<p class="muted small">${admin?"כל ההרפתקאות בספרייה. מה שמסומן \"לכל המנחים\" זמין לכל מנחה שנכנס עם Google; השאר רק למי שהעלה אותו.":"ההרפתקאות שפתוחות לכל המנחים, ואלה שהעלית בעצמך. שחקנים רואים רק את מפת השחקנים."}</p>`;
+  let h=`<p class="muted small">${admin?"כל ההרפתקאות בספרייה. מה שמסומן \"לכל המנחים\" זמין לכל מנחה שנכנס עם Google; השאר רק למי שהעלה אותו.":"ההרפתקאות שפתוחות לכל המנחים, אלה שהעלית בעצמך ואלה ששותפו איתך. שחקנים רואים רק את מפת השחקנים."}</p>`;
   if(LIB==null||LIB==="loading") h+=`<p class="muted small">טוען…</p>`;
   else if(LIB==="error") h+=`<p class="small">לא הצלחתי לטעון את הספרייה. אם עוד לא עדכנת את חוקי האבטחה ב־Firebase, זו כנראה הסיבה.</p>`;
   else if(!LIB.length) h+=`<p class="muted small">הספרייה ריקה.</p>`;
   else h+=`<ul class="gm-list">${LIB.map(b=>{ const mine=b.owner===EXT.uid();
     return `<li><div class="gm-meta"><b>${esc(b.title||b.id)}</b>${b.ready?"":` <span class="tag">העלאה לא הושלמה</span>`}
       <div class="muted small">${esc(b.source||"")}${admin&&!mine?` · הועלתה על ידי <bdi>${esc(b.ownerEmail||"")}</bdi>`:""}</div>
-      ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":mine?"רק שלך":"פתוחה לך דרך משחק שלך"}</div>`}
-      ${!b.everyone&&(b.readers||[]).length&&(mine||admin)?`<div class="muted small">פתוחה גם למנחים במשחקים שמשתמשים בה: ${(b.readers||[]).map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""}</div>
-      <div class="lib-acts">${b.ready?`<button class="btn small" data-lib-view="${esc(b.id)}">${admin||mine?"עיון ועריכה":"עיון"}</button>`:""}${b.ready&&(admin||mine)?`<button class="btn small" data-lib-dl="${esc(b.id)}">הורדה</button>`:""}${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`;
+      ${admin?`<label class="small"><input type="checkbox" data-lib-every="${esc(b.id)}" ${b.everyone?"checked":""}> לכל המנחים</label>`:`<div class="muted small">${b.everyone?"פתוחה לכל המנחים":mine?((b.sh||[]).length?"שלך, ומשותפת":"רק שלך"):(b.sh||[]).includes(gEmail())?`שותפה איתך על ידי <bdi>${esc(b.ownerEmail||"")}</bdi>`:"פתוחה לך דרך משחק שלך"}</div>`}
+      ${!b.everyone&&(b.sh||[]).length&&(mine||admin)?`<div class="muted small">משותפת עם: ${b.sh.map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""}
+      ${(()=>{ const g=[...new Set(Object.values(b.rg||{}).flat())]; return !b.everyone&&g.length&&(mine||admin)?`<div class="muted small">פתוחה גם למנחים במשחקים שמשתמשים בה: ${g.map(x=>`<bdi>${esc(x)}</bdi>`).join(", ")}</div>`:""; })()}</div>
+      <div class="lib-acts">${b.ready?`<button class="btn small" data-lib-view="${esc(b.id)}">${admin||mine?"עיון ועריכה":"עיון"}</button>`:""}${b.ready&&(admin||mine)?`<button class="btn small" data-lib-share="${esc(b.id)}">שיתוף${(b.sh||[]).length?` (${b.sh.length})`:""}</button><button class="btn small" data-lib-dl="${esc(b.id)}">הורדה</button>`:""}${admin||mine?`<button class="btn small" data-lib-del="${esc(b.id)}" data-t="${esc(b.title||b.id)}">מחיקה</button>`:""}</div></li>`; }).join("")}</ul>`;
   h+=`<div class="gm-row"><label class="btn small" for="libFile">העלאת הרפתקה…</label><input type="file" id="libFile" accept=".json,application/json,image/*" multiple hidden ${LIB_BUSY?"disabled":""}>
     ${admin?`<label class="small"><input type="checkbox" id="libEvery" checked> לכל המנחים</label>`:""}</div>
     <p class="muted small">${LIB_BUSY?esc(LIB_BUSY):LIB_ERR&&LIB_ERR!=="err"?`<span class="dn">${esc(LIB_ERR)}</span>`:"בוחרים קובץ הרפתקה מוכן (json), או את קובץ הספר יחד עם תמונות המפות שלו. לפני השמירה מוצגת בדיקה. הרפתקה עם אותו מזהה מתעדכנת."}</p>${libPrevHTML()}
@@ -5482,6 +5506,7 @@ function libPaint(){
   box.querySelectorAll("[data-lib-del]").forEach(b=>b.onclick=()=>libDelete(b.dataset.libDel,b.dataset.t));
   box.querySelectorAll("[data-lib-view]").forEach(b=>b.onclick=()=>edOpen(b.dataset.libView,"browse"));
   box.querySelectorAll("[data-lib-dl]").forEach(b=>b.onclick=()=>libDownload(b.dataset.libDl));
+  box.querySelectorAll("[data-lib-share]").forEach(b=>b.onclick=()=>libShare(b.dataset.libShare));
   box.querySelectorAll("[data-lib-every]").forEach(b=>b.onchange=()=>libEvery(b.dataset.libEvery,b.checked));
 }
 /* party basis for an adventure's own scaling instructions: size, the level most of the party has reached, average level */
