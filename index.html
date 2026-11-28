@@ -397,6 +397,8 @@ svg.d20{width:1.15em;height:1.15em;vertical-align:-.22em;fill:none;stroke:curren
 .pcmb .mst.dead{background:#e9d4d2}.pcmb .mst.hurt{background:#f3e2c0}
 /* players' dungeon map */
 #mapPane[hidden]{display:none}
+/* the character tabs mean nothing on the adventure screens; new/random characters are not made by players during an adventure */
+.app.v-adv #charTabs,.app.v-book #charTabs,.app.v-map #charTabs,.app.frozen #charTabs .ctab.add{display:none!important}
 .app.v-map .charpanel,.app.v-map .status,.app.v-map #leftPane,.app.v-map #cartPane,.app.v-map .frozen-note{display:none!important}
 .app.v-map .minibar .mb-who,.app.v-map #mbMoney,.app.v-map #mbWeight,.app.v-map #mbHP,.app.v-map #mbAC,.app.v-map #mbBook,.app.v-map #mbAdv{display:none!important}
 .pmap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
