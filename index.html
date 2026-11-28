@@ -257,6 +257,46 @@ input[type=number],input[type=text],input[type=search],select,textarea{backgroun
 .bked{position:fixed;inset:0;z-index:70;background:rgba(20,16,10,.45);display:flex;align-items:center;justify-content:center;padding:12px}
 body.bked-open{overflow:hidden}
 body.bked-open .scrim{z-index:80}
+/* map editor */
+.meed{position:fixed;inset:0;z-index:75;background:rgba(20,16,10,.55);display:flex;padding:8px}
+.me-box{background:var(--bg);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.me-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
+.me-tabs{display:flex;gap:4px;flex-wrap:wrap}.me-acts{display:flex;gap:6px;align-items:center;margin-inline-start:auto}
+.me-main{flex:1;display:flex;min-height:0}
+.me-side{width:300px;flex:0 0 auto;overflow:auto;padding:10px 12px;border-inline-end:1px solid var(--line)}.me-side>*{margin:0}.me-side>*+*{margin-top:8px}.me-side .ed-f{display:flex;flex-direction:column;gap:3px}.me-side textarea{width:100%;box-sizing:border-box}
+.me-side h3{margin:4px 0 0;font-size:.95rem}
+.me-tools{display:flex;gap:6px;flex-wrap:wrap}
+.me-rooms,.me-pl{display:flex;flex-direction:column;gap:2px}
+.me-room{all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;padding:5px 8px;border-radius:6px;font-size:.88rem}
+.me-room:hover{background:var(--surface)}.me-room.on{background:var(--accent);color:#fff}.me-room:focus-visible{outline:2px solid var(--accent)}
+.me-room .rn{font-weight:700;min-width:2.2em}.me-bd{margin-inline-start:auto;display:flex;gap:3px;font-style:normal}.me-bd i{font-style:normal;font-size:.8rem}.me-bd i.no{opacity:.25;filter:grayscale(1)}
+.me-th{border:1px solid var(--line);border-radius:6px;background:#fff;min-height:60px;display:grid;place-items:center;overflow:hidden}.me-th img{max-width:100%;max-height:160px;display:block}
+.me-stage{flex:1;overflow:auto;position:relative;background:#e9e4d8;direction:ltr;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+.me-stage.dragging{cursor:grabbing}.me-stage.tool{cursor:crosshair}
+.me-empty{padding:30px;text-align:center;direction:rtl}
+.me-in{position:relative;min-width:100%}.me-in img,.me-in canvas{display:block;width:100%;height:auto;-webkit-user-drag:none;pointer-events:none}
+#meOv{position:absolute;inset:0}
+.me-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.me-poly{fill:rgba(47,110,180,.12);stroke:rgba(47,110,180,.65);stroke-width:1.5;vector-effect:non-scaling-stroke;cursor:pointer}
+.me-poly.on{fill:rgba(214,120,20,.28);stroke:#c46a00;stroke-width:2.5;cursor:move}.me-poly.on.sel{fill:rgba(214,120,20,.4)}
+.me-tmp{fill:rgba(214,120,20,.18);stroke:#c46a00;stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
+.me-v,.me-m{position:absolute;transform:translate(-50%,-50%);border-radius:50%;box-sizing:border-box}
+.me-v{width:14px;height:14px;background:#fff;border:2.5px solid #c46a00;cursor:grab;z-index:3}.me-v.sel{background:#c46a00}
+.me-v.tmp{width:10px;height:10px;pointer-events:none}.me-v.first{width:16px;height:16px;border-color:#2f8a55}
+.me-m{width:10px;height:10px;background:rgba(196,106,0,.45);border:1.5px solid #fff;cursor:copy;z-index:2}
+@media (pointer:coarse){.me-v{width:22px;height:22px}.me-m{width:16px;height:16px}}
+.me-lab{position:absolute;transform:translate(-50%,-50%);font:700 .75rem/1 var(--font-body);color:#24507e;background:rgba(255,255,255,.75);padding:1px 4px;border-radius:4px;pointer-events:none}
+.me-pin{cursor:grab;touch-action:none}.me-pin.lk{opacity:.55;cursor:not-allowed}.me-pin.ghost{opacity:.5;pointer-events:none;background:#6b7578}
+.me-patch{position:absolute;outline:1.5px dashed rgba(47,110,180,.8);cursor:pointer}.me-patch img{width:100%;height:100%;display:block;pointer-events:none;opacity:.92}
+.me-patch.on{outline:2.5px solid #c46a00;cursor:move}.me-patch.lk{cursor:not-allowed}
+.me-plab{position:absolute;top:2px;left:2px;font:700 .72rem/1 var(--font-body);background:#c46a00;color:#fff;padding:2px 4px;border-radius:3px}
+.me-c{position:absolute;width:14px;height:14px;background:#fff;border:2.5px solid #c46a00;border-radius:3px}
+.me-c.nw{left:-7px;top:-7px;cursor:nwse-resize}.me-c.ne{right:-7px;top:-7px;cursor:nesw-resize}.me-c.sw{left:-7px;bottom:-7px;cursor:nesw-resize}.me-c.se{right:-7px;bottom:-7px;cursor:nwse-resize}
+:root[data-theme="dark"] .me-in:not(.pv) img,:root[data-theme="dark"] .me-th img{filter:invert(.88) hue-rotate(180deg)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .me-in:not(.pv) img,:root:not([data-theme="light"]) .me-th img{filter:invert(.88) hue-rotate(180deg)}}
+:root[data-theme="dark"] .me-patch img{filter:invert(.88) hue-rotate(180deg)}
+@media (max-width:760px){.me-main{flex-direction:column}.me-side{width:auto;max-height:38vh;border-inline-end:0;border-bottom:1px solid var(--line)}}
+
 .bked-box{background:var(--bg);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);width:min(980px,100%);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
 .bked-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
 .bked-top select{flex:1;min-width:160px;max-width:420px}.bked-acts{display:flex;gap:6px;margin-inline-start:auto}
@@ -4674,7 +4714,7 @@ async function edOpen(id,mode,sel){
   const b=QBOOKS[id]; if(!b||b._pub){ toast("אין לך גישה לספר המלא"); return; }
   ED={id,mode,sel:sel||"__intro",edit:mode==="run"}; edRender();
 }
-function edClose(){ ED=null; const o=$("bkEd"); if(o) o.remove(); document.body.classList.remove("bked-open"); }
+function edClose(){ ED=null; const o=$("bkEd"); if(o) o.remove(); if(!ME) document.body.classList.remove("bked-open"); }
 function edLocked(rid){ if(!ED||ED.mode!=="run"||rid==="__intro") return false; const q=qst(); if(q.active!==ED.id) return false;
   const r=((q.by[ED.id]||{}).rooms||{})[rid]; return !!(r&&r.st==="clear"); }
 const edLines=a=>(a||[]).join("\n"), edUnlines=t=>String(t||"").split("\n").map(x=>x.trim()).filter(Boolean);
@@ -4768,7 +4808,7 @@ function edRender(){
     <div class="bked-top"><b>${ED.mode==="browse"?"עיון בספר":"עריכת הספר"}: ${esc(b.title)}</b>
       <select id="edSel" ${ED.edit?"disabled":""} aria-label="פרק בספר">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===ED.sel?"selected":""}>${esc(l)}</option>`).join("")}</select>
       <span class="bked-acts">${ED.edit&&can&&!locked?`<button class="btn small primary" data-ed="save">שמירה</button><button class="btn small" data-ed="cancel">ביטול</button>`
-        :`${can&&!locked?`<button class="btn small" data-ed="edit">✎ עריכה</button>`:""}${ED.mode==="browse"?`<button class="btn small ghost" data-ed="prev" title="הקודם">‹</button><button class="btn small ghost" data-ed="next" title="הבא">›</button>`:""}<button class="btn small ghost" data-ed="close" aria-label="סגירה">✕</button>`}</span></div>
+        :`${can&&!locked?`<button class="btn small" data-ed="edit">✎ עריכה</button>`:""}${can?`<button class="btn small" data-ed="map">🗺 עריכת המפה</button>`:""}${ED.mode==="browse"?`<button class="btn small ghost" data-ed="prev" title="הקודם">‹</button><button class="btn small ghost" data-ed="next" title="הבא">›</button>`:""}<button class="btn small ghost" data-ed="close" aria-label="סגירה">✕</button>`}</span></div>
     ${locked?`<p class="ed-lock">החדר הזה סומן "נוקה" במשחק הנוכחי, ולכן נעול לעריכה כאן. אפשר לערוך אותו בעיון בספר מהספרייה (הגדרות ← ספרייה).</p>`:""}
     ${!can&&ED.mode==="browse"?`<p class="muted small">רק מי שהעלה את הספר יכול לערוך אותו.</p>`:""}
     <div class="bked-body">${body}</div></div>`;
@@ -4779,6 +4819,7 @@ async function edClick(e){
   const a=t.dataset.ed, b=QBOOKS[ED.id];
   if(a==="close") return edClose();
   if(a==="edit"){ ED.edit=true; return edRender(); }
+  if(a==="map") return meOpen();
   if(a==="cancel"){ if(ED.mode==="run") return edClose(); ED.edit=false; return edRender(); }
   if(a==="prev"||a==="next"){ const ids=["__intro",...b.rooms.map(r=>r.id)], i=ids.indexOf(ED.sel)+(a==="next"?1:-1); if(i>=0&&i<ids.length){ ED.sel=ids[i]; edRender(); $("bkEd").querySelector(".bked-body").scrollTop=0; } return; }
   if(a==="del"){ t.closest(".ed-row").remove(); return; }
@@ -4817,10 +4858,304 @@ async function edSave(raw){
   QRAW[id]=raw; const nb=await libImgs(id,JSON.parse(JSON.stringify(raw))); nb.id=id; QBOOKS[id]=nb; QINDEX=null; LIB=null;
 }
 
+/* ---------- the map editor: pins, the room areas of the players' map, patches (pictures shown over the players' map once a room is visited)
+   and the map pictures themselves. Works on a draft of book.map; nothing is stored until "שמירה". Coordinates are percent of the picture.
+   Rooms cleared in the current game are locked here as in the text editor. ---------- */
+let ME=null;
+const ME_LAYERS=[["pins","📍 סיכות"],["regions","▱ אזורי חדרים"],["patches","🧩 מדבקות"],["imgs","🖼 תמונות"]];
+const meR=v=>Math.round(v*100)/100;
+function meOpen(){
+  const raw=QRAW[ED.id]; if(!raw) return;
+  const d=JSON.parse(JSON.stringify(raw.map||{}));
+  const first=(raw.rooms||[])[0];
+  ME={id:ED.id,d,layer:d.file?"pins":"imgs",room:ED.sel!=="__intro"&&ED.sel!=="__map"?ED.sel:(first&&first.id),zoom:1,tool:null,tmp:null,sel:null,patch:null,undo:[],dirty:false,imgs:{},pv:"",n:0};
+  document.body.classList.add("bked-open"); meRender();
+}
+function meClose(force){
+  if(!ME) return;
+  if(ME.dirty&&!force) return ask("לצאת בלי לשמור?","השינויים במפה שלא נשמרו יאבדו.","יציאה",()=>meClose(true));
+  ME=null; const o=$("meEd"); if(o) o.remove(); if(ED&&!$("bkEd")) ED=null; if(!ED) document.body.classList.remove("bked-open");
+}
+const meRooms=()=>(QRAW[ME.id].rooms||[]);
+const meLocked=rid=>!!(rid&&edLocked(rid));
+/* a picture of the draft: one just picked here, else the stored one */
+function meSrc(ref){ if(!ref) return ""; if(ME.imgs[ref]) return ME.imgs[ref]; const c=IMG_CACHE[ME.id+"/"+String(ref).slice(4)]; return c||""; }
+function mePush(){ ME.undo.push(JSON.stringify(ME.d)); if(ME.undo.length>80) ME.undo.shift(); ME.dirty=true; }
+function meUndo(){ if(!ME.undo.length) return; ME.d=JSON.parse(ME.undo.pop()); ME.sel=null; ME.tmp=null; ME.dirty=true; meRender(); }
+const meP=()=>{ const P=ME.d.players; return P||null; };
+const meRegs=()=>{ const P=meP(); return P?(P.regions=P.regions||{}):{}; };
+function meImgFor(){ const P=meP(); if(ME.layer==="patches") return P&&P.file; if(ME.layer==="regions"&&ME.pv) return null; return ME.d.file||(P&&P.file); }
+
+function meRender(){
+  if(!ME) return; const raw=QRAW[ME.id]; let o=$("meEd");
+  if(!o){ o=document.createElement("div"); o.id="meEd"; o.className="meed"; document.body.appendChild(o);
+    o.addEventListener("click",meClick); o.addEventListener("change",meChange); }
+  const keep=$("meStage")?[$("meStage").scrollLeft,$("meStage").scrollTop]:null;
+  o.innerHTML=`<div class="me-box" role="dialog" aria-modal="true" aria-label="עריכת המפה">
+    <div class="me-top"><b>עריכת המפה: ${esc(raw.title)}</b>
+      <span class="me-tabs" role="tablist">${ME_LAYERS.map(([k,l])=>`<button class="btn small${ME.layer===k?" primary":""}" role="tab" aria-selected="${ME.layer===k}" data-me="layer" data-v="${k}">${l}</button>`).join("")}</span>
+      <span class="me-acts"><span class="q-zoom"><button class="btn small" data-me="zoom" data-d="-1" aria-label="הקטנה" ${ME.zoom<=1?"disabled":""}>−</button><span class="num small">${Math.round(ME.zoom*100)}%</span><button class="btn small" data-me="zoom" data-d="1" aria-label="הגדלה" ${ME.zoom>=6?"disabled":""}>+</button></span>
+        <button class="btn small" data-me="undo" title="ביטול הפעולה האחרונה (Ctrl+Z)" ${ME.undo.length?"":"disabled"}>↶</button>
+        <button class="btn small primary" data-me="save" ${ME.dirty?"":"disabled"}>שמירה</button><button class="btn small ghost" data-me="close" aria-label="סגירה">✕</button></span></div>
+    <div class="me-main"><aside class="me-side">${meSide()}</aside>
+      <div class="me-stage${ME.tool?" tool":""}" id="meStage">${meStage()}</div></div></div>`;
+  const st=$("meStage"); if(keep){ st.scrollLeft=keep[0]; st.scrollTop=keep[1]; }
+  meBind(st); meOverlay();
+  if(ME.layer==="regions"&&ME.pv) mePreview();
+}
+function meRoomList(){
+  const regs=meRegs(), pins=ME.d.pins||{};
+  return `<div class="me-rooms" role="listbox" aria-label="חדרים">${meRooms().map(r=>{ const lk=meLocked(r.id);
+    return `<button class="me-room${ME.room===r.id?" on":""}" role="option" aria-selected="${ME.room===r.id}" data-me="room" data-id="${esc(r.id)}"><span class="rn">${esc(r.id)}</span> ${esc(r.name||"")}
+      <span class="me-bd">${pins[r.id]?'<i title="יש סיכה">📍</i>':'<i class="no" title="אין סיכה">📍</i>'}${regs[r.id]&&regs[r.id].length?'<i title="יש אזור">▱</i>':'<i class="no" title="אין אזור">▱</i>'}${lk?'<i title="נוקה במשחק הנוכחי">🔒</i>':""}</span></button>`; }).join("")}</div>`;
+}
+function meSide(){
+  const P=meP(), room=meRooms().find(r=>r.id===ME.room), lk=meLocked(ME.room);
+  const lockP=lk?`<p class="ed-lock small">חדר ${esc(ME.room)} סומן "נוקה" במשחק הנוכחי, ולכן נעול כאן. אפשר לערוך אותו מהספרייה (הגדרות ← ספרייה ← עיון).</p>`:"";
+  if(ME.layer==="pins"){
+    if(!ME.d.file) return `<p class="small">לספר אין מפת מנחה. מוסיפים אותה בלשונית "תמונות".</p>`;
+    const has=room&&(ME.d.pins||{})[room.id];
+    return `<p class="muted small">גוררים סיכה כדי להזיז אותה. לחדר בלי סיכה: בוחרים אותו ברשימה ולוחצים על המקום במפה.</p>${lockP}
+      ${room&&!lk?`<div class="me-tools">${has?`<button class="btn small${ME.tool==="place"?" primary":""}" data-me="tool" data-v="place">מיקום מחדש בלחיצה</button><button class="btn small del" data-me="delpin">מחיקת הסיכה</button>`:`<span class="small">לחיצה על המפה תציב סיכה לחדר ${esc(room.id)}.</span>`}</div>`:""}${meRoomList()}`;
+  }
+  if(ME.layer==="regions"){
+    if(!P) return `<p class="small">לספר אין מפת שחקנים. מוסיפים אותה בלשונית "תמונות".</p>`;
+    const sp=ME.sel&&ME.sel.p!=null;
+    return `<p class="muted small">האזור קובע איזה חלק ממפת השחקנים נחשף כשהחדר מסומן "ביקרו". גוררים פינה; לחיצה על נקודה באמצע צלע מוסיפה פינה; גרירת הצורה מזיזה אותה. מקש Delete מוחק את הפינה הנבחרת.</p>${lockP}
+      ${room&&!lk?`<div class="me-tools"><button class="btn small${ME.tool==="rect"?" primary":""}" data-me="tool" data-v="rect">▭ מלבן חדש</button><button class="btn small${ME.tool==="poly"?" primary":""}" data-me="tool" data-v="poly">✎ מצולע חדש</button>
+        ${ME.sel&&ME.sel.v!=null?`<button class="btn small" data-me="delv">מחיקת הפינה</button>`:""}${sp?`<button class="btn small del" data-me="delpoly">מחיקת הצורה</button>`:""}</div>
+        ${ME.tool==="rect"?`<p class="small">גוררים על המפה מפינה לפינה.</p>`:ME.tool==="poly"?`<p class="small">לוחצים על הפינות אחת אחרי השנייה. מסיימים בלחיצה על הפינה הראשונה, בלחיצה כפולה או ב־Enter. Esc מבטל.</p>`:""}`:""}
+      <label class="ed-f wide"><span>תצוגה</span><select data-me="pv"><option value="" ${!ME.pv?"selected":""}>עריכה על מפת המנחה</option><option value="room" ${ME.pv==="room"?"selected":""}>כך יראו השחקנים: החדר הנבחר</option><option value="all" ${ME.pv==="all"?"selected":""}>כך יראו השחקנים: כל החדרים</option></select></label>
+      ${meRoomList()}`;
+  }
+  if(ME.layer==="patches"){
+    if(!P) return `<p class="small">לספר אין מפת שחקנים. מוסיפים אותה בלשונית "תמונות".</p>`;
+    const L=P.patches||[], cur=ME.patch!=null&&L[ME.patch];
+    return `<p class="muted small">מדבקה היא תמונה שמופיעה מעל מפת השחקנים כשהחדר שלה מסומן "ביקרו", למשל חדר סודי שבמפת השחקנים מצויר כקיר רגיל. גוררים את המדבקה כדי להזיז, ואת הפינות כדי לשנות גודל.</p>
+      <div class="me-pl">${L.map((x,i)=>`<button class="me-room${ME.patch===i?" on":""}" data-me="patch" data-i="${i}">🧩 מדבקה לחדר ${esc(x.room)}${meLocked(x.room)?" 🔒":""}</button>`).join("")||'<p class="muted small">אין מדבקות.</p>'}</div>
+      <div class="me-tools"><button class="btn small" data-me="addpatch" ${room&&!lk?"":"disabled"}>+ מדבקה לחדר ${esc(ME.room||"")}</button></div>
+      ${cur?`<fieldset class="ed-row"><label class="ed-f"><span>החדר</span><select data-me="proom" ${meLocked(cur.room)?"disabled":""}>${meRooms().map(r=>`<option value="${esc(r.id)}" ${r.id===cur.room?"selected":""}>${esc(r.id)}. ${esc(r.name||"")}</option>`).join("")}</select></label>
+        <div class="me-tools"><button class="btn small" data-me="pimg" ${meLocked(cur.room)?"disabled":""}>החלפת התמונה</button><button class="btn small del" data-me="delpatch" ${meLocked(cur.room)?"disabled":""}>מחיקת המדבקה</button></div></fieldset>`:""}
+      <p class="muted small">לבחירת החדר של מדבקה חדשה: לשונית "סיכות" או "אזורי חדרים".</p><input type="file" id="meFile" accept="image/*" hidden>`;
+  }
+  const th=(ref,lbl)=>`<div class="me-th">${ref&&meSrc(ref)?`<img src="${meSrc(ref)}" alt="${lbl}">`:`<span class="muted small">אין</span>`}</div>`;
+  return `<h3>מפת המנחה</h3>${th(ME.d.file,"מפת המנחה")}<div class="me-tools"><button class="btn small" data-me="up" data-v="dm">${ME.d.file?"החלפת התמונה":"הוספת מפת מנחה"}</button></div>
+    <h3>מפת השחקנים</h3>${th(P&&P.file,"מפת השחקנים")}<div class="me-tools"><button class="btn small" data-me="up" data-v="pl" ${ME.d.file?"":"disabled"}>${P?"החלפת התמונה":"הוספת מפת שחקנים"}</button></div>
+    <p class="muted small">הסיכות והאזורים שמורים באחוזים מגודל התמונה. תמונה חדשה צריכה להיות באותן פרופורציות ובאותו חיתוך, אחרת הם יזוזו ממקומם. מפת השחקנים צריכה להיות באותו גודל כמו מפת המנחה, בלי מספרי חדרים.</p>
+    <label class="ed-f wide"><span>עמוד המפה</span><input data-me="f" data-k="page" value="${esc(ME.d.page||"")}"></label>
+    <label class="ed-f wide"><span>הערה למנחה על המפה</span><textarea data-me="f" data-k="note" rows="3">${esc(ME.d.note||"")}</textarea></label>
+    ${P?`<label class="ed-f wide"><span>הערה במפת השחקנים</span><textarea data-me="f" data-k="players.note" rows="3">${esc(P.note||"")}</textarea></label>`:""}
+    <input type="file" id="meFile" accept="image/*" hidden>`;
+}
+function meStage(){
+  if(ME.layer==="imgs"){ const ref=ME.d.file; return ref&&meSrc(ref)?`<div class="me-in" style="width:${ME.zoom*100}%"><img id="meImg" src="${meSrc(ref)}" alt="מפת המנחה"><div id="meOv"></div></div>`:`<p class="muted me-empty">אין עדיין מפה.</p>`; }
+  if(ME.layer==="regions"&&ME.pv) return `<div class="me-in pv" style="width:${ME.zoom*100}%"><canvas id="mePv" role="img" aria-label="תצוגה של מפת השחקנים"></canvas></div>`;
+  const ref=meImgFor(); if(!ref||!meSrc(ref)) return `<p class="muted me-empty">אין תמונה. מוסיפים אותה בלשונית "תמונות".</p>`;
+  const pl=ME.layer==="patches";
+  return `<div class="me-in${pl?" pl":""}" style="width:${ME.zoom*100}%"><img id="meImg" src="${meSrc(ref)}" alt="${pl?"מפת השחקנים":"מפת המנחה"}"><div id="meOv"></div></div>`;
+}
+const mePts=poly=>poly.map(([x,y])=>`${x},${y}`).join(" ");
+function meCentroid(poly){ let x=0,y=0; for(const p of poly){ x+=p[0]; y+=p[1]; } return [x/poly.length,y/poly.length]; }
+/* the editable layer over the picture; redrawn on every change (the picture itself stays) */
+function meOverlay(){
+  const ov=$("meOv"); if(!ov) return; let h="";
+  if(ME.layer==="pins"){
+    h=Object.entries(ME.d.pins||{}).map(([id,[x,y]])=>`<button class="q-pin me-pin${ME.room===id?" sel":""}${meLocked(id)?" lk":""}" style="left:${x}%;top:${y}%" data-pin="${esc(id)}" title="חדר ${esc(id)}">${esc(id)}</button>`).join("");
+  } else if(ME.layer==="regions"){
+    const regs=meRegs(); let svg="", lab="", hd="";
+    for(const [id,polys] of Object.entries(regs)){ const on=id===ME.room;
+      (polys||[]).forEach((poly,i)=>{ if(!poly||poly.length<3) return;
+        svg+=`<polygon points="${mePts(poly)}" class="me-poly${on?" on":""}${on&&ME.sel&&ME.sel.p===i?" sel":""}" data-room="${esc(id)}" data-p="${i}"/>`;
+        if(!on){ const [cx,cy]=meCentroid(poly); if(i===0) lab+=`<span class="me-lab" style="left:${cx}%;top:${cy}%">${esc(id)}</span>`; } }); }
+    const mine=regs[ME.room]||[];
+    if(!meLocked(ME.room)) mine.forEach((poly,i)=>poly.forEach(([x,y],j)=>{ const [nx,ny]=poly[(j+1)%poly.length];
+      hd+=`<span class="me-v${ME.sel&&ME.sel.p===i&&ME.sel.v===j?" sel":""}" style="left:${x}%;top:${y}%" data-p="${i}" data-v="${j}" title="פינה"></span>`;
+      hd+=`<span class="me-m" style="left:${(x+nx)/2}%;top:${(y+ny)/2}%" data-p="${i}" data-m="${j}" title="הוספת פינה"></span>`; }));
+    if(ME.tmp&&ME.tmp.pts&&ME.tmp.pts.length){ const t=ME.tmp.pts; svg+=`<polyline points="${mePts(t)}" class="me-tmp"/>`; hd+=t.map(([x,y],j)=>`<span class="me-v tmp${j===0?" first":""}" style="left:${x}%;top:${y}%"></span>`).join(""); }
+    if(ME.tmp&&ME.tmp.rect){ const [a,b,c,d]=ME.tmp.rect; svg+=`<polygon points="${mePts([[a,b],[c,b],[c,d],[a,d]])}" class="me-tmp"/>`; }
+    const pin=(ME.d.pins||{})[ME.room]; if(pin) hd+=`<span class="q-pin me-pin ghost" style="left:${pin[0]}%;top:${pin[1]}%">${esc(ME.room)}</span>`;
+    h=`<svg class="me-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>${lab}${hd}`;
+  } else if(ME.layer==="patches"){
+    const L=(meP()&&meP().patches)||[];
+    h=L.map((x,i)=>{ const [a,b,c,d]=x.box, on=ME.patch===i, src=meSrc(x.file);
+      return `<div class="me-patch${on?" on":""}${meLocked(x.room)?" lk":""}" style="left:${a}%;top:${b}%;width:${c-a}%;height:${d-b}%" data-pt="${i}">${src?`<img src="${src}" alt="">`:""}<span class="me-plab">${esc(x.room)}</span>
+        ${on&&!meLocked(x.room)?["nw","ne","sw","se"].map(k=>`<span class="me-c ${k}" data-c="${k}"></span>`).join(""):""}</div>`; }).join("");
+  }
+  ov.innerHTML=h;
+}
+function mePreview(){
+  const P=meP(), cv=$("mePv"); if(!P||!cv) return; const im=new Image(); im.onload=()=>{
+    const regs=meRegs(), seen=ME.pv==="all"?Object.keys(regs):(regs[ME.room]?[ME.room]:[]);
+    const pats=(P.patches||[]).filter(x=>seen.includes(x.room)).map(x=>{ const i2=new Image(); i2.src=meSrc(x.file); return {box:x.box,im:i2}; });
+    Promise.all(pats.map(p=>p.im.complete?0:new Promise(r=>{p.im.onload=p.im.onerror=r;}))).then(()=>{ if($("mePv")===cv) drawPMap(cv,im,regs,seen,pats); }); };
+  im.src=meSrc(P.file);
+}
+/* pointer: drag pins, corners, shapes and patches; draw rectangles and polygons; drag the empty map to move around */
+function mePct(e){ const r=$("meStage").querySelector(".me-in").getBoundingClientRect(); return [meR(Math.min(100,Math.max(0,(e.clientX-r.left)/r.width*100))),meR(Math.min(100,Math.max(0,(e.clientY-r.top)/r.height*100)))]; }
+function meBind(st){
+  st.onpointerdown=e=>{
+    if(e.button!==0||!st.querySelector(".me-in")||(ME.layer==="regions"&&ME.pv)) return;
+    const t=e.target, p=mePct(e), D={x:e.clientX,y:e.clientY,p0:p,moved:false,id:e.pointerId};
+    const lockMsg=rid=>{ toast(`חדר ${rid} נוקה במשחק הנוכחי ונעול כאן`); };
+    if(ME.layer==="pins"){
+      const pin=t.closest("[data-pin]");
+      if(pin){ const id=pin.dataset.pin; ME.room=id; if(meLocked(id)){ lockMsg(id); meRender(); return; } D.kind="pin"; D.rid=id; D.push=false; }
+      else if(ME.tool==="place"||(ME.room&&!(ME.d.pins||{})[ME.room])) D.kind="place"; else D.kind="pan";
+    } else if(ME.layer==="regions"){
+      const v=t.closest(".me-v:not(.tmp)"), m=t.closest(".me-m"), pg=t.closest("polygon[data-room]");
+      if(ME.tool==="rect"){ D.kind="rect"; }
+      else if(ME.tool==="poly"){ D.kind="polyclick"; }
+      else if(v){ D.kind="vtx"; D.pi=+v.dataset.p; D.vi=+v.dataset.v; ME.sel={p:D.pi,v:D.vi}; }
+      else if(m){ mePush(); const poly=meRegs()[ME.room][+m.dataset.p], j=+m.dataset.m; poly.splice(j+1,0,p); D.kind="vtx"; D.pi=+m.dataset.p; D.vi=j+1; D.pushed=true; ME.sel={p:D.pi,v:D.vi}; meOverlay(); }
+      else if(pg&&pg.dataset.room!==ME.room){ ME.room=pg.dataset.room; ME.sel=null; meRender(); return; }
+      else if(pg){ if(meLocked(ME.room)){ lockMsg(ME.room); return; } D.kind="poly"; D.pi=+pg.dataset.p; D.orig=JSON.parse(JSON.stringify(meRegs()[ME.room][D.pi])); ME.sel={p:D.pi}; }
+      else D.kind="pan";
+    } else if(ME.layer==="patches"){
+      const c=t.closest("[data-c]"), pt=t.closest("[data-pt]");
+      if(pt){ const i=+pt.dataset.pt, x=meP().patches[i]; if(ME.patch!==i){ ME.patch=i; meRender(); return; } if(meLocked(x.room)){ lockMsg(x.room); return; }
+        D.kind=c?"corner":"patch"; D.c=c&&c.dataset.c; D.orig=x.box.slice(); }
+      else D.kind="pan";
+    } else D.kind="pan";
+    D.l=st.scrollLeft; D.t=st.scrollTop; ME.drag=D;
+    try{ st.setPointerCapture(e.pointerId); }catch(_){}
+    if(D.kind!=="pan") e.preventDefault();
+  };
+  st.onpointermove=e=>{ const D=ME&&ME.drag; if(!D||e.pointerId!==D.id) return;
+    const dx=e.clientX-D.x, dy=e.clientY-D.y; if(!D.moved&&Math.hypot(dx,dy)<4) return; D.moved=true;
+    const p=mePct(e);
+    if(D.kind==="pan"){ st.classList.add("dragging"); st.scrollLeft=D.l-dx; st.scrollTop=D.t-dy; return; }
+    if(D.kind==="pin"){ if(!D.push){ mePush(); D.push=true; } ME.d.pins[D.rid]=p; const el=st.querySelector(`[data-pin="${CSS.escape(D.rid)}"]`); if(el){ el.style.left=p[0]+"%"; el.style.top=p[1]+"%"; } return; }
+    if(D.kind==="vtx"){ if(!D.pushed){ mePush(); D.pushed=true; } meRegs()[ME.room][D.pi][D.vi]=p; meOverlay(); return; }
+    if(D.kind==="poly"){ if(!D.pushed){ mePush(); D.pushed=true; } const ddx=p[0]-D.p0[0], ddy=p[1]-D.p0[1]; meRegs()[ME.room][D.pi]=D.orig.map(([x,y])=>[meR(x+ddx),meR(y+ddy)]); meOverlay(); return; }
+    if(D.kind==="rect"){ ME.tmp={rect:[Math.min(D.p0[0],p[0]),Math.min(D.p0[1],p[1]),Math.max(D.p0[0],p[0]),Math.max(D.p0[1],p[1])]}; meOverlay(); return; }
+    if(D.kind==="patch"||D.kind==="corner"){ if(!D.pushed){ mePush(); D.pushed=true; } const x=meP().patches[ME.patch], o=D.orig, ddx=p[0]-D.p0[0], ddy=p[1]-D.p0[1];
+      if(D.kind==="patch"){ const w=o[2]-o[0], h=o[3]-o[1], a=Math.min(100-w,Math.max(0,o[0]+ddx)), b=Math.min(100-h,Math.max(0,o[1]+ddy)); x.box=[meR(a),meR(b),meR(a+w),meR(b+h)]; }
+      else { let [a,b,c,d]=o; if(D.c.includes("w")) a=Math.min(p[0],c-0.5); else c=Math.max(p[0],a+0.5); if(D.c.includes("n")) b=Math.min(p[1],d-0.5); else d=Math.max(p[1],b+0.5); x.box=[meR(a),meR(b),meR(c),meR(d)]; }
+      meOverlay(); return; }
+  };
+  const up=e=>{ const D=ME&&ME.drag; if(!D||(e&&e.pointerId!==D.id)) return; ME.drag=null; st.classList.remove("dragging"); const p=e?mePct(e):D.p0;
+    if(D.kind==="place"&&!D.moved){ if(!ME.room) return; if(meLocked(ME.room)) return toast("החדר נעול"); mePush(); ME.d.pins=ME.d.pins||{}; ME.d.pins[ME.room]=p; ME.tool=null; return meRender(); }
+    if(D.kind==="rect"){ const r=ME.tmp&&ME.tmp.rect; ME.tmp=null; if(r&&r[2]-r[0]>0.4&&r[3]-r[1]>0.4){ mePush(); const regs=meRegs(); (regs[ME.room]=regs[ME.room]||[]).push([[r[0],r[1]],[r[2],r[1]],[r[2],r[3]],[r[0],r[3]]].map(q=>q.map(meR))); ME.sel={p:regs[ME.room].length-1}; ME.tool=null; }
+      return meRender(); }
+    if(D.kind==="polyclick"&&!D.moved){ ME.tmp=ME.tmp&&ME.tmp.pts?ME.tmp:{pts:[]}; const t0=ME.tmp.pts[0];
+      if(t0&&ME.tmp.pts.length>=3&&Math.hypot(t0[0]-p[0],t0[1]-p[1])<1.2) return meFinishPoly();
+      ME.tmp.pts.push(p); return meOverlay(); }
+    if(D.moved&&(D.kind==="pin"||D.kind==="vtx"||D.kind==="poly"||D.kind==="patch"||D.kind==="corner")) return meRender();
+    if(!D.moved&&(D.kind==="vtx"||D.kind==="poly")) return meRender();
+  };
+  st.onpointerup=up; st.onpointercancel=()=>{ if(ME){ ME.drag=null; ME.tmp=ME.tool==="poly"?ME.tmp:null; } };
+  st.ondblclick=e=>{ if(ME&&ME.tool==="poly"&&ME.tmp&&ME.tmp.pts){ e.preventDefault(); meFinishPoly(); } };
+}
+function meFinishPoly(){
+  const t=ME.tmp&&ME.tmp.pts; if(!t) return;
+  const pts=t.filter((q,i)=>!i||Math.hypot(q[0]-t[i-1][0],q[1]-t[i-1][1])>0.2);
+  ME.tmp=null; ME.tool=null;
+  if(pts.length>=3){ mePush(); const regs=meRegs(); (regs[ME.room]=regs[ME.room]||[]).push(pts); ME.sel={p:regs[ME.room].length-1}; }
+  else toast("למצולע צריכות להיות לפחות 3 פינות");
+  meRender();
+}
+function meDelVertex(){
+  const s=ME.sel; if(!s||s.v==null||meLocked(ME.room)) return; const regs=meRegs(), L=regs[ME.room]; if(!L||!L[s.p]) return;
+  mePush(); L[s.p].splice(s.v,1); if(L[s.p].length<3){ L.splice(s.p,1); toast("הצורה נמחקה, כי נשארו בה פחות משלוש פינות"); }
+  if(!L.length) delete regs[ME.room]; ME.sel=null; meRender();
+}
+/* a picked picture: read, shrunk like on import, and checked against the map's proportions */
+function meRead(f){ return fileURL(f).then(d=>libFitImg(d)).then(d=>{ if(!d) throw new Error("big"); return d; }); }
+const meDim=src=>new Promise(r=>{ const im=new Image(); im.onload=()=>r([im.naturalWidth,im.naturalHeight]); im.onerror=()=>r(null); im.src=src; });
+function mePick(fn){ const inp=$("meFile"); if(!inp) return; inp.value=""; inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return;
+  try{ fn(await meRead(f)); }catch(e){ toast("לא הצלחתי לקרוא את התמונה, או שהיא גדולה מדי"); } }; inp.click(); }
+const meNew=()=>"img:new"+(++ME.n);
+async function meUpload(which){
+  mePick(async data=>{
+    const nd=await meDim(data); if(!nd) return toast("לא הצלחתי לקרוא את התמונה");
+    const P=meP(), cur=which==="dm"?ME.d.file:(P&&P.file), other=which==="dm"?(P&&P.file):ME.d.file;
+    const ref0=cur||other, od=ref0&&meSrc(ref0)?await meDim(meSrc(ref0)):null;
+    const apply=()=>{ mePush();
+      if(which==="dm"){ if(ME.d.file){ ME.imgs[ME.d.file]=data; } else { const r=meNew(); ME.imgs[r]=data; ME.d.file=r; ME.d.pins=ME.d.pins||{}; } }
+      else { if(P){ ME.imgs[P.file]=data; } else { const r=meNew(); ME.imgs[r]=data; ME.d.players={file:r,regions:{}}; } }
+      meRender(); toast("התמונה תישמר בלחיצה על \"שמירה\""); };
+    if(od){ const a=nd[0]/nd[1], b=od[0]/od[1];
+      if(Math.abs(a-b)/b>0.02) return ask("הפרופורציות של התמונה שונות",`התמונה החדשה ${nd[0]}×${nd[1]}, והמפה ${od[0]}×${od[1]}. הסיכות והאזורים שמורים באחוזים, ולכן הם יזוזו ממקומם. להשתמש בה בכל זאת?`,"שימוש בתמונה",apply); }
+    apply();
+  });
+}
+async function meAddPatch(){
+  const P=meP(); if(!P||!ME.room) return;
+  mePick(async data=>{
+    const nd=await meDim(data), md=await meDim(meSrc(P.file)); if(!nd||!md) return toast("לא הצלחתי לקרוא את התמונה");
+    const w=Math.min(60,nd[0]/md[0]*100), h=Math.min(60,nd[1]/md[1]*100), c=(ME.d.pins||{})[ME.room]||[50,50];
+    const a=Math.min(100-w,Math.max(0,c[0]-w/2)), b=Math.min(100-h,Math.max(0,c[1]-h/2));
+    mePush(); const r=meNew(); ME.imgs[r]=data; P.patches=P.patches||[]; P.patches.push({room:ME.room,box:[a,b,a+w,b+h].map(meR),file:r}); ME.patch=P.patches.length-1; meRender();
+  });
+}
+function meClick(e){
+  const t=e.target.closest("[data-me]"); if(!t) return; const a=t.dataset.me;
+  if(a==="close") return meClose();
+  if(a==="layer"){ ME.layer=t.dataset.v; ME.tool=null; ME.tmp=null; ME.sel=null; return meRender(); }
+  if(a==="zoom"){ const Z=[1,1.5,2,3,4,6], i=Z.indexOf(ME.zoom)+(+t.dataset.d), st=$("meStage"), cx=st?(st.scrollLeft+st.clientWidth/2)/st.scrollWidth:.5, cy=st?(st.scrollTop+st.clientHeight/2)/st.scrollHeight:.5;
+    if(i<0||i>=Z.length) return; ME.zoom=Z[i]; meRender(); const s2=$("meStage"); if(s2){ s2.scrollLeft=cx*s2.scrollWidth-s2.clientWidth/2; s2.scrollTop=cy*s2.scrollHeight-s2.clientHeight/2; } return; }
+  if(a==="undo") return meUndo();
+  if(a==="save") return meSave(t);
+  if(a==="room"){ ME.room=t.dataset.id; ME.sel=null; ME.tmp=null; if(ME.tool==="place") ME.tool=null; meRender(); meFocusRoom(); return; }
+  if(a==="tool"){ const v=t.dataset.v; ME.tool=ME.tool===v?null:v; ME.tmp=null; return meRender(); }
+  if(a==="delpin"){ if(meLocked(ME.room)) return; mePush(); delete ME.d.pins[ME.room]; return meRender(); }
+  if(a==="delv") return meDelVertex();
+  if(a==="delpoly"){ const s=ME.sel, regs=meRegs(); if(!s||s.p==null||!regs[ME.room]||meLocked(ME.room)) return; mePush(); regs[ME.room].splice(s.p,1); if(!regs[ME.room].length) delete regs[ME.room]; ME.sel=null; return meRender(); }
+  if(a==="patch"){ ME.patch=+t.dataset.i; return meRender(); }
+  if(a==="addpatch") return meAddPatch();
+  if(a==="delpatch"){ const L=meP().patches; ask("למחוק את המדבקה?",`המדבקה של חדר ${L[ME.patch].room} תימחק מהמפה.`,"מחיקה",()=>{ mePush(); L.splice(ME.patch,1); if(!L.length) delete meP().patches; ME.patch=null; meRender(); }); return; }
+  if(a==="pimg"){ const x=meP().patches[ME.patch]; mePick(d=>{ mePush(); const r=meNew(); ME.imgs[r]=d; x.file=r; meRender(); }); return; }
+  if(a==="up") return meUpload(t.dataset.v);
+}
+function meChange(e){
+  const t=e.target.closest("[data-me]"); if(!t) return; const a=t.dataset.me;
+  if(a==="pv"){ ME.pv=t.value; ME.tool=null; ME.tmp=null; return meRender(); }
+  if(a==="proom"){ mePush(); meP().patches[ME.patch].room=t.value; return meRender(); }
+  if(a==="f"){ mePush(); const v=t.value.trim(), k=t.dataset.k; if(k==="players.note"){ if(v) meP().note=v; else delete meP().note; } else if(v) ME.d[k]=v; else delete ME.d[k]; $("meEd").querySelector('[data-me="save"]').disabled=false; return; }
+}
+function meFocusRoom(){ const st=$("meStage"); if(!st||ME.zoom<=1) return; const pin=(ME.d.pins||{})[ME.room]; if(!pin) return;
+  st.scrollLeft=pin[0]/100*st.scrollWidth-st.clientWidth/2; st.scrollTop=pin[1]/100*st.scrollHeight-st.clientHeight/2; }
+/* saving: new pictures get keys next to the book's others, replaced ones overwrite theirs, removed ones are deleted;
+   the players' part of the map is also copied to the book's public document, which players read */
+async function meSave(btn){
+  const id=ME.id, raw=JSON.parse(JSON.stringify(QRAW[id])), d=JSON.parse(JSON.stringify(ME.d)), meta=QMETA[id];
+  for(const [k,polys] of Object.entries((d.players&&d.players.regions)||{})){ const ok=(polys||[]).filter(p=>p&&p.length>=3); if(ok.length) d.players.regions[k]=ok; else delete d.players.regions[k]; }
+  if(d.pins&&!Object.keys(d.pins).length) delete d.pins;
+  const used=new Set(); JSON.stringify(d,(k,v)=>{ if(typeof v==="string"&&v.startsWith("img:")) used.add(v); return v; });
+  const P=d.players, pside=new Set(P?[P.file,...(P.patches||[]).map(x=>x.file)]:[]);
+  const have=(meta.imgs||[]).slice(), next=pre=>{ let n=0; for(const k of have) if(k[0]===pre) n=Math.max(n,+k.slice(1)+1); have.push(pre+n); return pre+n; };
+  const ren={}; for(const r of used) if(r.startsWith("img:new")) ren[r]="img:"+next(pside.has(r)?"p":"d");
+  const nd=JSON.parse(JSON.stringify(d),(k,v)=>typeof v==="string"&&ren[v]?ren[v]:v);
+  const keys=new Set(); JSON.stringify(nd,(k,v)=>{ if(typeof v==="string"&&/^img:[pd]\d+$/.test(v)) keys.add(v.slice(4)); return v; });
+  const oldKeys=new Set(); JSON.stringify(raw.map||{},(k,v)=>{ if(typeof v==="string"&&/^img:[pd]\d+$/.test(v)) oldKeys.add(v.slice(4)); return v; });
+  try{ btn.disabled=true; let n=0; const todo=Object.entries(ME.imgs).filter(([r])=>used.has(r));
+    for(const [r,data] of todo){ const k=(ren[r]||r).slice(4); toast(`שומר תמונה ${++n} מתוך ${todo.length}…`);
+      await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).set({data}); IMG_CACHE[id+"/"+k]=data; }
+    raw.map=nd; if(!nd.file&&!nd.players&&!nd.pins) delete raw.map;
+    const at=new Date().toISOString();
+    await dbRef.doc("books/"+id+"/dm/book").set({json:JSON.stringify(raw),savedAt:at});
+    let pub={}; try{ pub=JSON.parse(meta.pub||"{}"); }catch(e){} pub.map=nd.players?{players:nd.players}:null;
+    const imgs=[...new Set([...(meta.imgs||[]).filter(k=>keys.has(k)||!oldKeys.has(k)),...keys])];
+    const up={savedAt:at,pub:JSON.stringify(pub),imgs}; await dbRef.doc("books/"+id).update(up); Object.assign(meta,up);
+    for(const k of oldKeys) if(!keys.has(k)){ try{ await dbRef.doc("books/"+id+"/"+(k[0]==="p"?"pimg":"dimg")+"/"+k).delete(); }catch(e){} delete IMG_CACHE[id+"/"+k]; }
+    QRAW[id]=raw; const nb=await libImgs(id,JSON.parse(JSON.stringify(raw))); nb.id=id; QBOOKS[id]=nb; QINDEX=null; LIB=null;
+    ME.d=JSON.parse(JSON.stringify(nd)); ME.imgs={}; ME.undo=[]; ME.dirty=false; meRender(); toast("המפה נשמרה בספרייה");
+    if(typeof renderQuest==="function"&&!$("questPane")?.hidden) renderQuest(); if(location.hash==="#map") renderMap();
+  }catch(x){ console.warn(x); btn.disabled=false; toast("השמירה נכשלה. בדקו את החיבור ונסו שוב"); }
+}
+document.addEventListener("keydown",e=>{
+  if(!ME||!$("meEd")||e.defaultPrevented) return; const sc=$("scrim"); if(sc&&!sc.hidden) return;
+  const t=e.target; if(t&&t.closest&&t.closest("input,textarea,select,[contenteditable]")) return;
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==="z"){ e.preventDefault(); meUndo(); return; }
+  if((e.key==="Delete"||e.key==="Backspace")&&ME.layer==="regions"&&ME.sel&&ME.sel.v!=null){ e.preventDefault(); meDelVertex(); return; }
+  if(e.key==="Enter"&&ME.tool==="poly"){ e.preventDefault(); meFinishPoly(); }
+});
+function meEsc(){ if(ME.tool||ME.tmp){ ME.tool=null; ME.tmp=null; meRender(); return; } meClose(); }
+
 /* ---------- arrows page through the rooms while browsing a book, like the ‹ › buttons (right-to-left: → is the previous room) ---------- */
 document.addEventListener("keydown",e=>{
   if((e.key!=="ArrowRight"&&e.key!=="ArrowLeft")||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||e.defaultPrevented) return;
-  if(!ED||ED.edit||ED.mode!=="browse"||!$("bkEd")) return;
+  if(!ED||ED.edit||ED.mode!=="browse"||!$("bkEd")||$("meEd")) return;
   const sc=$("scrim"); if(sc&&!sc.hidden) return;
   const t=e.target; if(t&&t.closest&&t.closest("input,textarea,select,[contenteditable]")) return;
   const btn=$("bkEd").querySelector(`[data-ed="${e.key==="ArrowRight"?"prev":"next"}"]`); if(!btn) return;
@@ -4831,7 +5166,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keydown",e=>{
   if(e.key!=="Escape"||e.defaultPrevented||e.isComposing) return;
   const open=id=>{ const x=$(id); return !!(x&&!x.hidden); };
-  const stops=[["scrim",()=>closeDlg()],["lvScrim",()=>closeLevelUp()],["porView",()=>porZoomClose()],["porScrim",()=>porClose()],["prScrim",()=>prClose()],["rollScrim",()=>rollClose()],["genScrim",()=>genClose()],["modeScrim",()=>modeClose()],
+  const stops=[["scrim",()=>closeDlg()],["lvScrim",()=>closeLevelUp()],["porView",()=>porZoomClose()],["porScrim",()=>porClose()],["prScrim",()=>prClose()],["rollScrim",()=>rollClose()],["genScrim",()=>genClose()],["modeScrim",()=>modeClose()],["meEd",()=>meEsc()],
     ["bkEd",()=>{ if(ED&&ED.edit){ ask("לצאת בלי לשמור?","השינויים שלא נשמרו בטופס יאבדו.","יציאה",()=>{ if(ED.mode==="run") edClose(); else { ED.edit=false; edRender(); } }); } else edClose(); }],
     ["relPanel",()=>{ $("relPanel").hidden=true; $("verBtn").focus(); }],
     ["backupPanel",()=>{ $("backupPanel").hidden=true; $("backupBtn").setAttribute("aria-expanded","false"); $("backupBtn").focus(); }]];
@@ -5212,7 +5547,7 @@ function qRoom(b,r){
 /* the adventure map with a clickable pin on every room, colored by its state */
 function qMap(b){
   const s=qs(b.id), M=b.map;
-  return `<article class="q-room q-mapbox"><div class="q-rh"><h2>מפה ${M.page?`<small class="muted">${esc(M.page)}</small>`:""}</h2><span class="q-zoom"><button class="btn small" data-q="zoom" data-d="-1" aria-label="הקטנה" ${QZOOM<=1?"disabled":""}>−</button><span class="num small">${Math.round(QZOOM*100)}%</span><button class="btn small" data-q="zoom" data-d="1" aria-label="הגדלה" ${QZOOM>=4?"disabled":""}>+</button>${QZOOM>1?`<button class="btn small ghost" data-q="zoom" data-d="0">גודל מלא</button>`:""}</span><span class="muted small">לחיצה על מספר פותחת את החדר</span></div>
+  return `<article class="q-room q-mapbox"><div class="q-rh"><h2>מפה ${M.page?`<small class="muted">${esc(M.page)}</small>`:""}</h2><span class="q-zoom"><button class="btn small" data-q="zoom" data-d="-1" aria-label="הקטנה" ${QZOOM<=1?"disabled":""}>−</button><span class="num small">${Math.round(QZOOM*100)}%</span><button class="btn small" data-q="zoom" data-d="1" aria-label="הגדלה" ${QZOOM>=4?"disabled":""}>+</button>${QZOOM>1?`<button class="btn small ghost" data-q="zoom" data-d="0">גודל מלא</button>`:""}</span><span class="muted small">לחיצה על מספר פותחת את החדר</span>${canEditBook(b.id)&&MODE==="dm"?`<button class="btn small ghost" data-q="mapedit" title="עריכת הסיכות, אזורי החדרים ותמונות המפה">✎ עריכת המפה</button>`:""}</div>
    <div class="q-map" id="qMapView"><div class="q-mapin" style="width:${QZOOM*100}%"><img src="${esc(M.file)}" alt="מפת ${esc(b.title)}">${Object.entries(M.pins||{}).map(([id,[x,y]])=>{const r=(b.rooms||[]).find(q=>q.id===id); if(!r) return ""; const rs=roomSt(b.id,id), left=qMonLeft(b,r);
      return `<button class="q-pin st-${rs.st||"none"}${s.cur===id?" sel":""}" style="left:${x}%;top:${y}%" data-q="room" data-id="${esc(id)}" title="${esc(id+" · "+r.name+" · "+Q_ST[rs.st])}" aria-label="חדר ${esc(id)}: ${esc(r.name)}">${esc(id)}${left?`<i>⚔${left}</i>`:""}</button>`;}).join("")}</div></div>
    <p class="muted small"><span class="q-lg none"></span> לא נחקר <span class="q-lg seen"></span> ביקרו <span class="q-lg clear"></span> נוקה · ⚔ מפלצות שנותרו${M.note?` · ${esc(M.note)}`:""}</p></article>`;
@@ -5291,6 +5626,8 @@ function questInit(){
     switch(act){
       case "map": QMAP=!QMAP; renderQuest(); $("qDetail")&&($("qDetail").scrollTop=0); if(QMAP) qMapFocus(); return;
       case "edit": edOpen(b.id,"run",t.dataset.rid); return;
+      case "mapedit": { const go=()=>{ if(!QRAW[b.id]) return toast("אין לך גישה לספר המלא"); ED={id:b.id,mode:"run",sel:s.cur||"__intro",edit:false}; meOpen(); };
+        if(QRAW[b.id]) go(); else { toast("טוען את הספר…"); delete QBOOKS[b.id]; qLoadBook(b.id).then(go); } return; }
       case "zoom": {const v=$("qMapView"), old=QZOOM, d=Number(t.dataset.d);
         const cx=v?(v.scrollLeft+v.clientWidth/2)/v.scrollWidth:.5, cy=v?(v.scrollTop+v.clientHeight/2)/v.scrollHeight:.5;
         QZOOM=d===0?1:Math.max(1,Math.min(4,+(QZOOM*(d>0?1.5:1/1.5)).toFixed(2))); if(QZOOM<1.05) QZOOM=1; if(old===QZOOM) return;
