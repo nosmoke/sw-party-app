@@ -48,14 +48,47 @@ them off a grid picture, then let the scripts snap them to the ink, then look at
    room numbers inside a legend. `{"box": [...], "fill": true}` paints a whole box with the colour around it.
 2. Look at `..._check.png` (before/after of each box) **and** at the whole players' picture zoomed with
    map_grid. Nothing numbered or secret may remain. Floor grid lines under a number may fade — fine.
-3. Secret doors drawn as a door symbol in a wall cannot be erased cleanly by inpainting. Options, in order:
-   leave the symbol and write in `map.players.note` that the secret doors are drawn; or, if the room
-   behind it is secret, that is already safe (its area shows only when visited). Do not hand-paint.
-4. A room that should *look different* once found (a secret room hidden behind a plain wall on the
-   players' picture) uses `players.patches`: `{"room": "8", "box": [x0,y0,x1,y1], "file": "books/<id>-room8.png"}`
-   — a crop of the DM picture shown over the players' picture when room 8 is visited.
-   Make it with `map_prep.py crop dm.jpg room8.png x0 y0 x1 y1` from the *DM* picture after erasing
-   numbers (run map_players on it first if needed).
+3. Then secret rooms and secret doors — step 2b.
+
+## 2b. Secret rooms and secret doors
+The players' map is shown to the players from the start (only the areas of visited rooms), so anything
+drawn on it can give a secret away: a room behind a "plain" wall, a passage stub, a door symbol.
+1. **Find them in the text** while reading the adventure (plan.md): "secret door", "hidden passage",
+   "concealed", "דלת סודית/סתרים", rooms reachable only through one, an "S" on the map. Put what the
+   characters can find, and how (dice, who gets a bonus), in that room's `secret` field.
+2. Decide for each one:
+   - **A secret room** (the whole room is unknown until found) → hide it on the players' picture and
+     give it a patch that shows it when the room is marked visited. Example: room 14 of "הצלת ליאם",
+     a room off a corridor whose door is secret: on the players' map the corridor wall runs on unbroken
+     and the room's area is plain paper; once 14 is visited the patch shows the room and its passage.
+   - **A secret door between known rooms** → only the door is hidden: a wall line over it, no patch
+     (or a small patch with the door, on the room behind it, if the door should appear when found).
+   - The DM only marks the secret on the map with an "S" → erasing the S in step 1 (`_` key) is enough.
+3. Write `work/map/secret.json` (coordinates read off zoomed map_grid pictures of the players' picture):
+   ```json
+   {"14": {"fills": [ {"poly": [[42.1,78.4],[46.2,78.4],[46.3,87.6],[41.6,86.0]], "like": [38,82]},
+                      {"poly": [[46.3,79.0],[47.0,79.0],[47.0,87.4],[46.3,87.4]], "like": [46.6,77.5]} ],
+           "walls": [ {"from": [47.35,80.6], "to": [47.35,85.4], "like": [47.35,78.5]} ]}}
+   ```
+   - `fills`: polygons to paint over — the room, its door/passage and its own rock or hatching — each
+     with `like`, a point whose surface the area should look like (paper outside the dungeon, solid
+     rock, hatching). Prefer one fill with plain paper or solid rock; textured fills (hatching) can show
+     repeats, so keep those strips narrow.
+   - `walls`: lines to draw where the secret door or passage met a wall that stays. `like` is a point
+     on that wall a little further along it: its thickness and colour are copied and the new line is moved
+     sideways onto it, so it continues the wall exactly. Make the line a bit longer than the gap.
+   - `box` (optional): the patch area; default = around the fills.
+4. `python3 S/map_secret.py work/map/<id>-map-players.jpg work/map/secret.json work/map/<id>-map-players.jpg work/map/secret`
+   (in and out may be the same file; keep a copy of the input to redo it). Writes the patches
+   (`patch-<id>.png`, cut from the picture *before* hiding, so with numbers already erased) and
+   `patches.json`, and `secret_check.png`: for each room, before | hidden | hidden + patch.
+5. Look at the check, then zoom on the hidden picture with map_grid: no trace of the room, its door,
+   or its passage; the new wall in line with the old; the painted area blends in. Adjust and rerun from
+   the saved copy. The third column must look like the first inside the orange box.
+6. Pass the patches to the book: `map_json.py ... --patches work/map/secret/patches.json`.
+   Also give each secret room its area in step 3 as usual — the patch shows the drawing, the area
+   reveals it; both appear only when the room is marked visited.
+   The DM can fine-tune patches later in the app's map editor (מדבקות).
 
 ## 3. Room areas (regions)
 Every floor area should belong to some room, or the players will never see it. Corridors: give a

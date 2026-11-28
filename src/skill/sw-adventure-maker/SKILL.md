@@ -29,7 +29,7 @@ References (open each at the step that needs it):
    tables, stat blocks, sidebars; the text layer can scramble columns — check it against the picture).
 3. Make `work/plan.md`: title; source and credits (author, cartographer, licence); levels and party size;
    the list of keyed areas `id – name – page`; the maps (which page, one or several levels);
-   names of people/places with their Hebrew spelling; every monster kind with its Hebrew name
+   names of people/places with their Hebrew spelling; secret rooms and secret doors (references/maps.md 2b); every monster kind with its Hebrew name
    (monsters.md) and stats; story events that change later rooms (→ `flags`) and achievements that give
    XP (→ `goals`); wandering-monster and other tables; anything unclear.
 4. Ask the user only what you cannot decide well yourself, in one short message, and continue with
@@ -61,7 +61,8 @@ Rules:
 
 ## 3. The map
 Follow `references/maps.md`: prepare the picture, pins (`map_grid.py` → `map_pins.py` with checking),
-players' picture (`map_players.py`), room areas (`map_rooms.py` with checking), then `map_json.py`
+players' picture (`map_players.py`), secret rooms hidden with patches (`map_secret.py`), room areas
+(`map_rooms.py` with checking), then `map_json.py`
 and put `"map": json.load(open("work/out/map.json"))` in the book. This is the part users notice most:
 take the time to look at every check picture and fix what is off. Typical effort: one rough pass plus
 one or two correction passes per step.
