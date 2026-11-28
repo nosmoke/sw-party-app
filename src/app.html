@@ -249,6 +249,8 @@ body.bked-open .scrim{z-index:80}
 .me-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
 .me-tabs{display:flex;gap:4px;flex-wrap:wrap}.me-acts{display:flex;gap:6px;align-items:center;margin-inline-start:auto}
 .me-main{flex:1;display:flex;min-height:0}
+.me-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}.me-cap{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.me-which{font-weight:700;font-size:.9rem;padding:2px 10px;border-radius:999px;color:#fff}.me-which.dm{background:#8a4b0f}.me-which.pl{background:#2f6e4a}.me-seg{display:flex;gap:4px}.me-newp{align-items:flex-end}
 .me-side{width:300px;flex:0 0 auto;overflow:auto;padding:10px 12px;border-inline-end:1px solid var(--line)}.me-side>*{margin:0}.me-side>*+*{margin-top:8px}.me-side .ed-f{display:flex;flex-direction:column;gap:3px}.me-side textarea{width:100%;box-sizing:border-box}
 .me-side h3{margin:4px 0 0;font-size:.95rem}
 .me-tools{display:flex;gap:6px;flex-wrap:wrap}
@@ -4854,7 +4856,7 @@ function meOpen(){
   const raw=QRAW[ED.id]; if(!raw) return;
   const d=JSON.parse(JSON.stringify(raw.map||{}));
   const first=(raw.rooms||[])[0];
-  ME={id:ED.id,d,layer:d.file?"pins":"imgs",room:ED.sel!=="__intro"&&ED.sel!=="__map"?ED.sel:(first&&first.id),zoom:1,tool:null,tmp:null,sel:null,patch:null,undo:[],dirty:false,imgs:{},pv:"",n:0};
+  ME={id:ED.id,d,iv:"dm",layer:d.file?"pins":"imgs",room:ED.sel!=="__intro"&&ED.sel!=="__map"?ED.sel:(first&&first.id),zoom:1,tool:null,tmp:null,sel:null,patch:null,undo:[],dirty:false,imgs:{},pv:"",n:0};
   document.body.classList.add("bked-open"); meRender();
 }
 function meClose(force){
@@ -4884,7 +4886,7 @@ function meRender(){
         <button class="btn small" data-me="undo" title="ביטול הפעולה האחרונה (Ctrl+Z)" ${ME.undo.length?"":"disabled"}>↶</button>
         <button class="btn small primary" data-me="save" ${ME.dirty?"":"disabled"}>שמירה</button><button class="btn small ghost" data-me="close" aria-label="סגירה">✕</button></span></div>
     <div class="me-main"><aside class="me-side">${meSide()}</aside>
-      <div class="me-stage${ME.tool?" tool":""}" id="meStage">${meStage()}</div></div></div>`;
+      <div class="me-col"><div class="me-cap">${meCap()}</div><div class="me-stage${ME.tool?" tool":""}" id="meStage">${meStage()}</div></div></div></div>`;
   const st=$("meStage"); if(keep){ st.scrollLeft=keep[0]; st.scrollTop=keep[1]; }
   meBind(st); meOverlay();
   if(ME.layer==="regions"&&ME.pv) mePreview();
@@ -4919,10 +4921,11 @@ function meSide(){
     const L=P.patches||[], cur=ME.patch!=null&&L[ME.patch];
     return `<p class="muted small">מדבקה היא תמונה שמופיעה מעל מפת השחקנים כשהחדר שלה מסומן "ביקרו", למשל חדר סודי שבמפת השחקנים מצויר כקיר רגיל. גוררים את המדבקה כדי להזיז, ואת הפינות כדי לשנות גודל.</p>
       <div class="me-pl">${L.map((x,i)=>`<button class="me-room${ME.patch===i?" on":""}" data-me="patch" data-i="${i}">🧩 מדבקה לחדר ${esc(x.room)}${meLocked(x.room)?" 🔒":""}</button>`).join("")||'<p class="muted small">אין מדבקות.</p>'}</div>
-      <div class="me-tools"><button class="btn small" data-me="addpatch" ${room&&!lk?"":"disabled"}>+ מדבקה לחדר ${esc(ME.room||"")}</button></div>
+      <div class="me-tools me-newp"><label class="ed-f"><span>מדבקה חדשה לחדר</span><select data-me="newroom" aria-label="החדר של המדבקה החדשה">${meRooms().map(r=>`<option value="${esc(r.id)}" ${r.id===ME.room?"selected":""} ${meLocked(r.id)?"disabled":""}>${esc(r.id)}. ${esc(r.name||"")}${meLocked(r.id)?" 🔒":""}</option>`).join("")}</select></label>
+        <button class="btn small" data-me="addpatch" ${room&&!lk?"":"disabled"}>+ הוספת מדבקה</button></div>
       ${cur?`<fieldset class="ed-row"><label class="ed-f"><span>החדר</span><select data-me="proom" ${meLocked(cur.room)?"disabled":""}>${meRooms().map(r=>`<option value="${esc(r.id)}" ${r.id===cur.room?"selected":""}>${esc(r.id)}. ${esc(r.name||"")}</option>`).join("")}</select></label>
         <div class="me-tools"><button class="btn small" data-me="pimg" ${meLocked(cur.room)?"disabled":""}>החלפת התמונה</button><button class="btn small del" data-me="delpatch" ${meLocked(cur.room)?"disabled":""}>מחיקת המדבקה</button></div></fieldset>`:""}
-      <p class="muted small">לבחירת החדר של מדבקה חדשה: לשונית "סיכות" או "אזורי חדרים".</p><input type="file" id="meFile" accept="image/*" hidden>`;
+      <input type="file" id="meFile" accept="image/*" hidden>`;
   }
   const th=(ref,lbl)=>`<div class="me-th">${ref&&meSrc(ref)?`<img src="${meSrc(ref)}" alt="${lbl}">`:`<span class="muted small">אין</span>`}</div>`;
   return `<h3>מפת המנחה</h3>${th(ME.d.file,"מפת המנחה")}<div class="me-tools"><button class="btn small" data-me="up" data-v="dm">${ME.d.file?"החלפת התמונה":"הוספת מפת מנחה"}</button></div>
@@ -4933,8 +4936,16 @@ function meSide(){
     ${P?`<label class="ed-f wide"><span>הערה במפת השחקנים</span><textarea data-me="f" data-k="players.note" rows="3">${esc(P.note||"")}</textarea></label>`:""}
     <input type="file" id="meFile" accept="image/*" hidden>`;
 }
+function meCap(){
+  const P=meP(), dm='<span class="me-which dm">מפת המנחה</span>', pl='<span class="me-which pl">מפת השחקנים</span>';
+  if(ME.layer==="pins") return dm+'<span class="muted small">הסיכות מופיעות למנחה בלבד</span>';
+  if(ME.layer==="regions") return ME.pv?pl+`<span class="muted small">תצוגה בלבד: ${ME.pv==="all"?"כל החדרים נחשפו":"רק החדר הנבחר נחשף"}</span>`:dm+'<span class="muted small">האזורים קובעים מה נחשף במפת השחקנים</span>';
+  if(ME.layer==="patches") return pl+'<span class="muted small">המדבקות מופיעות כשהחדר שלהן מסומן "ביקרו"</span>';
+  const iv=ME.iv==="pl"&&P?"pl":"dm";
+  return `<span class="me-seg" role="group" aria-label="איזו מפה להציג"><button class="btn small${iv==="dm"?" primary":""}" data-me="iv" data-v="dm" aria-pressed="${iv==="dm"}">מפת המנחה</button><button class="btn small${iv==="pl"?" primary":""}" data-me="iv" data-v="pl" aria-pressed="${iv==="pl"}" ${P?"":"disabled"}>מפת השחקנים</button></span>`;
+}
 function meStage(){
-  if(ME.layer==="imgs"){ const ref=ME.d.file; return ref&&meSrc(ref)?`<div class="me-in" style="width:${ME.zoom*100}%"><img id="meImg" src="${meSrc(ref)}" alt="מפת המנחה"><div id="meOv"></div></div>`:`<p class="muted me-empty">אין עדיין מפה.</p>`; }
+  if(ME.layer==="imgs"){ const P=meP(), pl=ME.iv==="pl"&&P, ref=pl?P.file:ME.d.file; return ref&&meSrc(ref)?`<div class="me-in" style="width:${ME.zoom*100}%"><img id="meImg" src="${meSrc(ref)}" alt="${pl?"מפת השחקנים":"מפת המנחה"}"><div id="meOv"></div></div>`:`<p class="muted me-empty">אין עדיין מפה.</p>`; }
   if(ME.layer==="regions"&&ME.pv) return `<div class="me-in pv" style="width:${ME.zoom*100}%"><canvas id="mePv" role="img" aria-label="תצוגה של מפת השחקנים"></canvas></div>`;
   const ref=meImgFor(); if(!ref||!meSrc(ref)) return `<p class="muted me-empty">אין תמונה. מוסיפים אותה בלשונית "תמונות".</p>`;
   const pl=ME.layer==="patches";
@@ -4993,7 +5004,7 @@ function meBind(st){
       else if(ME.tool==="poly"){ D.kind="polyclick"; }
       else if(v){ D.kind="vtx"; D.pi=+v.dataset.p; D.vi=+v.dataset.v; ME.sel={p:D.pi,v:D.vi}; }
       else if(m){ mePush(); const poly=meRegs()[ME.room][+m.dataset.p], j=+m.dataset.m; poly.splice(j+1,0,p); D.kind="vtx"; D.pi=+m.dataset.p; D.vi=j+1; D.pushed=true; ME.sel={p:D.pi,v:D.vi}; meOverlay(); }
-      else if(pg&&pg.dataset.room!==ME.room){ ME.room=pg.dataset.room; ME.sel=null; meRender(); return; }
+      else if(pg&&pg.dataset.room!==ME.room){ ME.room=pg.dataset.room; ME.sel=null; meRender(); meFocusRoom(); return; }
       else if(pg){ if(meLocked(ME.room)){ lockMsg(ME.room); return; } D.kind="poly"; D.pi=+pg.dataset.p; D.orig=JSON.parse(JSON.stringify(meRegs()[ME.room][D.pi])); ME.sel={p:D.pi}; }
       else D.kind="pan";
     } else if(ME.layer==="patches"){
@@ -5087,7 +5098,8 @@ function meClick(e){
   if(a==="delpin"){ if(meLocked(ME.room)) return; mePush(); delete ME.d.pins[ME.room]; return meRender(); }
   if(a==="delv") return meDelVertex();
   if(a==="delpoly"){ const s=ME.sel, regs=meRegs(); if(!s||s.p==null||!regs[ME.room]||meLocked(ME.room)) return; mePush(); regs[ME.room].splice(s.p,1); if(!regs[ME.room].length) delete regs[ME.room]; ME.sel=null; return meRender(); }
-  if(a==="patch"){ ME.patch=+t.dataset.i; return meRender(); }
+  if(a==="patch"){ ME.patch=+t.dataset.i; meRender(); meFocusRoom(); return; }
+  if(a==="iv"){ ME.iv=t.dataset.v; return meRender(); }
   if(a==="addpatch") return meAddPatch();
   if(a==="delpatch"){ const L=meP().patches; ask("למחוק את המדבקה?",`המדבקה של חדר ${L[ME.patch].room} תימחק מהמפה.`,"מחיקה",()=>{ mePush(); L.splice(ME.patch,1); if(!L.length) delete meP().patches; ME.patch=null; meRender(); }); return; }
   if(a==="pimg"){ const x=meP().patches[ME.patch]; mePick(d=>{ mePush(); const r=meNew(); ME.imgs[r]=d; x.file=r; meRender(); }); return; }
@@ -5097,10 +5109,24 @@ function meChange(e){
   const t=e.target.closest("[data-me]"); if(!t) return; const a=t.dataset.me;
   if(a==="pv"){ ME.pv=t.value; ME.tool=null; ME.tmp=null; return meRender(); }
   if(a==="proom"){ mePush(); meP().patches[ME.patch].room=t.value; return meRender(); }
+  if(a==="newroom"){ ME.room=t.value; meRender(); meFocusRoom(); return; }
   if(a==="f"){ mePush(); const v=t.value.trim(), k=t.dataset.k; if(k==="players.note"){ if(v) meP().note=v; else delete meP().note; } else if(v) ME.d[k]=v; else delete ME.d[k]; $("meEd").querySelector('[data-me="save"]').disabled=false; return; }
 }
-function meFocusRoom(){ const st=$("meStage"); if(!st||ME.zoom<=1) return; const pin=(ME.d.pins||{})[ME.room]; if(!pin) return;
-  st.scrollLeft=pin[0]/100*st.scrollWidth-st.clientWidth/2; st.scrollTop=pin[1]/100*st.scrollHeight-st.clientHeight/2; }
+/* the spot of the chosen room on the map shown: its patch, its area or its pin */
+function meSpot(){
+  const P=meP();
+  if(ME.layer==="patches"&&P&&P.patches&&ME.patch!=null&&P.patches[ME.patch]){ const [a,b,c,d]=P.patches[ME.patch].box; return [(a+c)/2,(b+d)/2]; }
+  const regs=meRegs(), L=(regs[ME.room]||[]).filter(p=>p&&p.length>=3);
+  if(ME.layer!=="pins"&&L.length){ let x0=100,y0=100,x1=0,y1=0; for(const p of L) for(const [x,y] of p){ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); } return [(x0+x1)/2,(y0+y1)/2]; }
+  return (ME.d.pins||{})[ME.room]||null;
+}
+function meFocusRoom(){
+  const st=$("meStage"), inn=st&&st.querySelector(".me-in"); if(!inn) return; const sp=meSpot(); if(!sp) return;
+  const x=sp[0]/100*inn.offsetWidth, y=sp[1]/100*inn.offsetHeight, m=40;
+  const vis=x>=st.scrollLeft+m&&x<=st.scrollLeft+st.clientWidth-m&&y>=st.scrollTop+m&&y<=st.scrollTop+st.clientHeight-m;
+  if(vis) return;
+  st.scrollTo({left:x-st.clientWidth/2,top:y-st.clientHeight/2,behavior:"smooth"});
+}
 /* saving: new pictures get keys next to the book's others, replaced ones overwrite theirs, removed ones are deleted;
    the players' part of the map is also copied to the book's public document, which players read */
 async function meSave(btn){
